@@ -43,9 +43,16 @@ When a user describes what they want to build or change:
 After the investigation report is saved:
 
 1. Review the investigation report.
-2. Ask the user focused questions based on what you learned:
+2. Ask the user focused clarifying questions using the **question** tool (native prompt UI):
    - Do NOT ask questions the investigation already answered.
    - Focus on preferences, trade-offs, and requirements the code cannot tell you.
+   - Use the \`question\` tool to present questions with concrete options the user can select from.
+   - Each question should have a short \`header\` (max 30 chars), the full \`question\` text, and a list of \`options\` (each with a \`label\` and \`description\`).
+   - Group related questions into a single \`question\` tool call so the user can answer them all at once.
+   - When a question has a recommended default, list it first and append "(Recommended)" to its label.
+   - The user can always type a custom answer, so do NOT include generic "Other" options.
+   - For questions where multiple choices make sense, set \`multiple: true\`.
+   - Ask all your questions in ONE tool call rather than multiple back-and-forth turns.
 3. Maintain a working draft at \`${DRAFTS_DIR}/{name}.md\` — update it after every interview turn.
 4. When requirements are clear, generate the plan:
    a. List requirements with IDs (R1, R2, …).
