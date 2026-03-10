@@ -61,6 +61,19 @@ describe("plugin entry point", () => {
     expect(config.agent.worker.mode).toBe("subagent");
   });
 
+  test("config hook registers commands", async () => {
+    const hooks = await BlueprintPlugin(mockInput);
+    const config: Record<string, any> = {};
+
+    await hooks.config!(config);
+
+    expect(config.command).toBeDefined();
+    expect(config.command).toHaveProperty("plan");
+    expect(config.command).toHaveProperty("execute");
+    expect(config.command.plan.agent).toBe("planner");
+    expect(config.command.execute.agent).toBe("orchestrator");
+  });
+
   test("chat.message hook is a function", async () => {
     const hooks = await BlueprintPlugin(mockInput);
     expect(typeof hooks["chat.message"]).toBe("function");

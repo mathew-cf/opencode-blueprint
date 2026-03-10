@@ -1,6 +1,7 @@
 import type { Plugin } from "@opencode-ai/plugin";
 import * as path from "node:path";
 import { registerAgents } from "./agents";
+import { registerCommands } from "./commands";
 import { createWorktreeTools } from "./tools/worktree";
 import { createNotepadTools } from "./tools/notepad";
 import { createProgressTools } from "./tools/progress";
@@ -26,9 +27,10 @@ const BlueprintPlugin: Plugin = async (input) => {
     // -- Custom tools --
     tool: tools,
 
-    // -- Agent registration --
+    // -- Agent & command registration --
     config: async (config: Record<string, any>) => {
       registerAgents(config);
+      registerCommands(config);
     },
 
     // -- Track which agent owns each session (needed for guardrails) --

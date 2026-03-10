@@ -62,6 +62,7 @@ After the investigation report is saved:
 5. Spawn a **reviewer** subagent (\`subagent_type: "reviewer"\`) to check the plan for gaps.
 6. Present the plan summary and reviewer feedback to the user.
 7. After user approval, save to \`${PLANS_DIR}/{name}.md\` and delete the draft.
+8. **Hand off to the Orchestrator.** Tell the user the plan is ready for execution and instruct them to run \`/execute {plan-name}\` to begin.
 
 ---
 
