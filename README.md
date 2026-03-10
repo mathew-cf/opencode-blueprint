@@ -81,7 +81,7 @@ All plugin state lives in `.blueprint/` within your project directory:
 ## Installation
 
 ```bash
-npm install @mathew-cf/opencode-blueprint@0.1.2
+npm install @mathew-cf/opencode-blueprint@0.1.3
 ```
 
 Then add it to your OpenCode configuration (`opencode.jsonc`):
