@@ -103,7 +103,7 @@ describe("agent registration", () => {
 
     expect(config.agent.orchestrator.prompt).toContain("blueprint_worktree_create");
     expect(config.agent.orchestrator.prompt).toContain("blueprint_verify");
-    expect(config.agent.orchestrator.prompt).toContain("blueprint_notepad");
+    expect(config.agent.orchestrator.prompt).toContain("Notepad Convention");
     expect(config.agent.orchestrator.prompt).toContain("blueprint_progress");
   });
 

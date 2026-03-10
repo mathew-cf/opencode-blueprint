@@ -14,13 +14,6 @@ export interface WorktreeMetadata {
   createdAt: string;
 }
 
-export interface NotepadEntry {
-  type: "learnings" | "decisions" | "issues";
-  content: string;
-  taskId?: string;
-  timestamp: string;
-}
-
 export interface ProgressSummary {
   planName: string;
   implementedChecked: number;

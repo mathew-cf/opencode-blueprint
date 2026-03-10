@@ -3,7 +3,6 @@ import * as path from "node:path";
 import { registerAgents } from "./agents";
 import { registerCommands } from "./commands";
 import { createWorktreeTools } from "./tools/worktree";
-import { createNotepadTools } from "./tools/notepad";
 import { createProgressTools } from "./tools/progress";
 import { createVerifyTools } from "./tools/verify";
 import {
@@ -18,7 +17,6 @@ const BlueprintPlugin: Plugin = async (input) => {
   // Compose tools from all modules
   const tools = {
     ...createWorktreeTools(),
-    ...createNotepadTools(),
     ...createProgressTools(),
     ...createVerifyTools(),
   };

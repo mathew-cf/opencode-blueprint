@@ -83,7 +83,7 @@ ALL file operations must use absolute paths within this directory.
 ALL bash commands must set workdir to this path.
 
 ## CONTEXT
-{Relevant notepad entries from blueprint_notepad_read}
+{Relevant notepad entries from .blueprint/notepads/{planName}/}
 {Relevant sections from the investigation report}
 
 ## CONVENTIONS
