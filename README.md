@@ -1,4 +1,4 @@
-# @mathew-cf/opencode-blueprint v0.1.0
+# opencode-blueprint
 
 A structured development workflow plugin for [OpenCode](https://opencode.ai) that guides AI agents through investigation, planning, and parallel implementation with git worktree isolation.
 
@@ -10,41 +10,41 @@ LLM agents writing code tend to fail in predictable ways: they skip research, pr
 
 Blueprint adds five specialised agents and eight tools to OpenCode. The agents form a pipeline:
 
-```
-User request
-    |
-    v
-[Planner] ---- spawns ----> [Investigator] (x3-5, parallel)
-    |                               |
-    |  <-- investigation report ----+
-    |
-    |  interview loop with user
-    |
-    |---- spawns ----> [Reviewer] (checks plan for gaps)
-    |                       |
-    v  <-- feedback --------+
-  Approved plan
-    |
-    v
-[Orchestrator] ---- spawns ----> [Worker] (per task, in worktrees)
-    |                                  |
-    |  <-- code changes ---------------+
-    |
-    |  4-phase verification (review, tests, QA, gate)
-    |
-    v
-  Merged result
+```mermaid
+sequenceDiagram
+    actor User
+    participant P as Planner
+    participant I as Investigator
+    participant R as Reviewer
+    participant O as Orchestrator
+    participant W as Worker
+
+    User->>P: request
+    P->>+I: spawn (x3-5, parallel)
+    I-->>-P: investigation report
+    loop interview
+        P->>User: clarifying questions
+        User->>P: answers
+    end
+    P->>+R: spawn review
+    R-->>-P: feedback
+    Note over P: Approved plan
+    P->>O: hand off plan
+    O->>+W: spawn (per task, in worktrees)
+    W-->>-O: code changes
+    Note over O: 4-phase verification
+    Note over O: Merged result
 ```
 
 ### Agents
 
-| Agent | Mode | Role |
-|-------|------|------|
-| **Planner** | primary | Investigates the codebase, interviews the user, produces a structured implementation plan |
-| **Orchestrator** | primary | Executes plans by creating git worktrees, delegating tasks to workers, and verifying results |
-| **Investigator** | subagent | Deep codebase research — directory structure, patterns, conventions, dependencies |
-| **Reviewer** | subagent | Reviews plans and code for gaps, scope creep, and missing requirements |
-| **Worker** | subagent | Implements a single atomic task in an isolated git worktree |
+| Agent            | Mode     | Role                                                                                         |
+| ---------------- | -------- | -------------------------------------------------------------------------------------------- |
+| **Planner**      | primary  | Investigates the codebase, interviews the user, produces a structured implementation plan    |
+| **Orchestrator** | primary  | Executes plans by creating git worktrees, delegating tasks to workers, and verifying results |
+| **Investigator** | subagent | Deep codebase research — directory structure, patterns, conventions, dependencies            |
+| **Reviewer**     | subagent | Reviews plans and code for gaps, scope creep, and missing requirements                       |
+| **Worker**       | subagent | Implements a single atomic task in an isolated git worktree                                  |
 
 Primary agents appear in the OpenCode agent switcher. Subagents are spawned via the Task tool and are not directly selectable.
 
@@ -54,16 +54,16 @@ Only **worker** agents can write source code. The planner, orchestrator, investi
 
 ### Tools
 
-| Tool | Purpose |
-|------|---------|
-| `blueprint_worktree_create` | Create an isolated git worktree for a workstream |
-| `blueprint_worktree_merge` | Merge a workstream branch back to the base branch |
-| `blueprint_worktree_cleanup` | Remove a worktree and optionally delete its branch |
-| `blueprint_worktree_list` | List active worktrees with Blueprint metadata |
-| `blueprint_notepad_read` | Read accumulated context (learnings, decisions, issues) |
-| `blueprint_notepad_write` | Record learnings, decisions, or issues for future tasks |
-| `blueprint_progress` | Update plan checkboxes and get completion status |
-| `blueprint_verify` | Run tests, typecheck, and lint in a directory |
+| Tool                         | Purpose                                                 |
+| ---------------------------- | ------------------------------------------------------- |
+| `blueprint_worktree_create`  | Create an isolated git worktree for a workstream        |
+| `blueprint_worktree_merge`   | Merge a workstream branch back to the base branch       |
+| `blueprint_worktree_cleanup` | Remove a worktree and optionally delete its branch      |
+| `blueprint_worktree_list`    | List active worktrees with Blueprint metadata           |
+| `blueprint_notepad_read`     | Read accumulated context (learnings, decisions, issues) |
+| `blueprint_notepad_write`    | Record learnings, decisions, or issues for future tasks |
+| `blueprint_progress`         | Update plan checkboxes and get completion status        |
+| `blueprint_verify`           | Run tests, typecheck, and lint in a directory           |
 
 ### Workspace
 
@@ -74,25 +74,21 @@ All plugin state lives in `.blueprint/` within your project directory:
   investigations/   # Codebase research reports
   plans/            # Approved implementation plans
   drafts/           # Work-in-progress plan drafts
-  notepads/         # Accumulated context (learnings, decisions, issues)
-  worktrees/        # Worktree metadata (JSON)
+    notepads/         # Accumulated context (learnings, decisions, issues)
+    worktrees/        # Worktree metadata (JSON)
 ```
 
 ## Installation
 
-```bash
-npm install @mathew-cf/opencode-blueprint@0.1.3
-```
-
-Then add it to your OpenCode configuration (`opencode.jsonc`):
+Just add it to your OpenCode configuration (`opencode.jsonc`)!
 
 ```jsonc
 {
   "plugin": {
     "blueprint": {
-      "module": "@mathew-cf/opencode-blueprint"
-    }
-  }
+      "module": "@mathew-cf/opencode-blueprint",
+    },
+  },
 }
 ```
 
