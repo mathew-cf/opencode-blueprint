@@ -1,0 +1,40 @@
+{
+  "name": "@mathew-cf/opencode-blueprint",
+  "version": "0.1.0",
+  "description": "Structured development workflow plugin for OpenCode — investigation, planning, and parallel implementation with git worktree isolation",
+  "author": "mat",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mathew-cf/opencode-eng-team"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target node",
+    "test": "bun test",
+    "prepublishOnly": "bun run build",
+    "typecheck": "tsc --noEmit",
+    "sync-version": "bun scripts/sync-version.ts",
+    "version": "bun run sync-version && git add README.md"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "blueprint",
+    "workflow",
+    "planning"
+  ],
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.0.224",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.0.0"
+  }
+}
