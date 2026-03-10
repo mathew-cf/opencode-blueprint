@@ -14,7 +14,6 @@ export function registerAgents(config: Record<string, any>): void {
   // -- Primary agents (visible in agent switcher) --
 
   config.agent["planner"] = {
-    name: "Planner (Blueprint)",
     model: "anthropic/claude-opus-4-6",
     temperature: 0.1,
     prompt: plannerPrompt,
@@ -25,7 +24,6 @@ export function registerAgents(config: Record<string, any>): void {
   };
 
   config.agent["orchestrator"] = {
-    name: "Orchestrator (Blueprint)",
     model: "anthropic/claude-sonnet-4-6",
     temperature: 0.1,
     prompt: orchestratorPrompt,
