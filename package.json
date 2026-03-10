@@ -1,6 +1,6 @@
 {
   "name": "@mathew-cf/opencode-blueprint",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Structured development workflow plugin for OpenCode — investigation, planning, and parallel implementation with git worktree isolation",
   "author": "mat",
   "license": "Apache-2.0",
