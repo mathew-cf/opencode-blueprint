@@ -4,6 +4,7 @@ export const PLANS_DIR = `${WORKSPACE_DIR}/plans`;
 export const NOTEPADS_DIR = `${WORKSPACE_DIR}/notepads`;
 export const DRAFTS_DIR = `${WORKSPACE_DIR}/drafts`;
 export const WORKTREES_DIR = `${WORKSPACE_DIR}/worktrees`;
+export const WORKTREE_CHECKOUTS_DIR = `${WORKSPACE_DIR}/wt`;
 
 /** Agents that are NOT allowed to write files outside .blueprint/ */
 export const RESTRICTED_AGENTS = [

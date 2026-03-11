@@ -3,7 +3,7 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
-import { WORKSPACE_DIR, WORKTREES_DIR } from "../constants";
+import { WORKSPACE_DIR, WORKTREES_DIR, WORKTREE_CHECKOUTS_DIR } from "../constants";
 
 const execAsync = promisify(exec);
 
@@ -16,8 +16,7 @@ function metadataPath(repoRoot: string, planName: string, workstream: string): s
 }
 
 function worktreePath(repoRoot: string, planName: string, workstream: string): string {
-  const repoName = path.basename(repoRoot);
-  return path.join(path.dirname(repoRoot), `${repoName}-wt-${planName}-${workstream}`);
+  return path.join(repoRoot, WORKTREE_CHECKOUTS_DIR, `${planName}-${workstream}`);
 }
 
 function branchName(planName: string, workstream: string): string {

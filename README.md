@@ -8,7 +8,7 @@ LLM agents writing code tend to fail in predictable ways: they skip research, pr
 
 ## How It Works
 
-Blueprint adds five specialised agents and eight tools to OpenCode. The agents form a pipeline:
+Blueprint adds five specialised agents, six tools, and two slash commands to OpenCode. The agents form a pipeline:
 
 ```mermaid
 sequenceDiagram
@@ -60,10 +60,17 @@ Only **worker** agents can write source code. The planner, orchestrator, investi
 | `blueprint_worktree_merge`   | Merge a workstream branch back to the base branch       |
 | `blueprint_worktree_cleanup` | Remove a worktree and optionally delete its branch      |
 | `blueprint_worktree_list`    | List active worktrees with Blueprint metadata           |
-| `blueprint_notepad_read`     | Read accumulated context (learnings, decisions, issues) |
-| `blueprint_notepad_write`    | Record learnings, decisions, or issues for future tasks |
 | `blueprint_progress`         | Update plan checkboxes and get completion status        |
 | `blueprint_verify`           | Run tests, typecheck, and lint in a directory           |
+
+Notepads (accumulated context in `.blueprint/notepads/`) are managed via standard Read, Write, and Edit tools rather than dedicated plugin tools.
+
+### Commands
+
+| Command     | Purpose                                          |
+| ----------- | ------------------------------------------------ |
+| `/plan`     | Start a planning session with the planner agent  |
+| `/execute`  | Execute a plan with the orchestrator agent       |
 
 ### Workspace
 
@@ -74,8 +81,9 @@ All plugin state lives in `.blueprint/` within your project directory:
   investigations/   # Codebase research reports
   plans/            # Approved implementation plans
   drafts/           # Work-in-progress plan drafts
-    notepads/         # Accumulated context (learnings, decisions, issues)
-    worktrees/        # Worktree metadata (JSON)
+  notepads/         # Accumulated context (learnings, decisions, issues)
+  worktrees/        # Worktree metadata (JSON)
+  wt/               # Git worktree checkouts (one per workstream)
 ```
 
 ## Installation
@@ -123,7 +131,7 @@ Every completed task goes through four gates before being accepted:
 ```bash
 bun install
 bun run typecheck    # Type check
-bun test             # Run tests (67 tests across 7 files)
+bun test             # Run tests (68 tests across 7 files)
 bun run build        # Bundle to dist/
 ```
 

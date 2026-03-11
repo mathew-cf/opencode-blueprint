@@ -10,7 +10,7 @@ import {
   initGitRepo,
   execAsync,
 } from "./helpers";
-import { WORKTREES_DIR } from "../src/constants";
+import { WORKTREES_DIR, WORKTREE_CHECKOUTS_DIR } from "../src/constants";
 
 describe("worktree tools", () => {
   let tmpDir: string;
@@ -45,7 +45,7 @@ describe("worktree tools", () => {
     expect(result).toContain("blueprint/p1/ws1");
 
     // Verify directory exists
-    const wtPath = path.join(tmpDir, "testrepo-wt-p1-ws1");
+    const wtPath = path.join(repoDir, WORKTREE_CHECKOUTS_DIR, "p1-ws1");
     const stat = await fs.stat(wtPath);
     expect(stat.isDirectory()).toBe(true);
 
@@ -66,7 +66,7 @@ describe("worktree tools", () => {
     );
     expect(result).toContain("Worktree created");
 
-    const wtPath = path.join(tmpDir, "testrepo-wt-p1-ws2");
+    const wtPath = path.join(repoDir, WORKTREE_CHECKOUTS_DIR, "p1-ws2");
     const stat = await fs.stat(wtPath);
     expect(stat.isDirectory()).toBe(true);
   });
@@ -117,7 +117,7 @@ describe("worktree tools", () => {
     const ctx = mockCtx(repoDir);
 
     // Create a file in the worktree to have something to merge
-    const wtPath = path.join(tmpDir, "testrepo-wt-p1-ws2");
+    const wtPath = path.join(repoDir, WORKTREE_CHECKOUTS_DIR, "p1-ws2");
     await fs.writeFile(path.join(wtPath, "new-file.txt"), "hello\n");
     await execAsync("git add . && git commit -m 'add new file'", {
       cwd: wtPath,
@@ -154,7 +154,7 @@ describe("worktree tools", () => {
 
     // Verify directory is gone
     try {
-      await fs.stat(path.join(tmpDir, "testrepo-wt-p1-ws2"));
+      await fs.stat(path.join(repoDir, WORKTREE_CHECKOUTS_DIR, "p1-ws2"));
       throw new Error("Should not exist");
     } catch (err: any) {
       expect(err.code).toBe("ENOENT");
