@@ -14,6 +14,12 @@ export interface WorktreeMetadata {
   createdAt: string;
 }
 
+export interface PlanMetadata {
+  planName: string;
+  baseSha: string;
+  createdAt: string;
+}
+
 export interface ProgressSummary {
   planName: string;
   implementedChecked: number;

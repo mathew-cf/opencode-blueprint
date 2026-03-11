@@ -68,11 +68,52 @@ describe("agent registration", () => {
     });
   });
 
-  test("worker has no tool restrictions", () => {
+  test("worker has no agent-level tool restrictions", () => {
     const config: Record<string, any> = {};
     registerAgents(config);
 
     expect(config.agent.worker.tools).toBeUndefined();
+  });
+
+  // ── blueprint tool scoping ──
+
+  test("blueprint tools are globally disabled", () => {
+    const config: Record<string, any> = {};
+    registerAgents(config);
+
+    expect(config.tools).toBeDefined();
+    expect(config.tools["blueprint_*"]).toBe(false);
+  });
+
+  test("orchestrator re-enables blueprint tools", () => {
+    const config: Record<string, any> = {};
+    registerAgents(config);
+
+    expect(config.agent.orchestrator.tools).toBeDefined();
+    expect(config.agent.orchestrator.tools["blueprint_*"]).toBe(true);
+  });
+
+  test("non-orchestrator blueprint agents do not re-enable blueprint tools", () => {
+    const config: Record<string, any> = {};
+    registerAgents(config);
+
+    // planner, investigator, reviewer, worker should NOT have blueprint_* enabled
+    for (const name of ["planner", "investigator", "reviewer", "worker"]) {
+      const tools = config.agent[name].tools;
+      if (tools) {
+        expect(tools["blueprint_*"]).not.toBe(true);
+      }
+    }
+  });
+
+  test("global blueprint disable preserves existing tools config", () => {
+    const config: Record<string, any> = {
+      tools: { my_custom_tool: true },
+    };
+    registerAgents(config);
+
+    expect(config.tools.my_custom_tool).toBe(true);
+    expect(config.tools["blueprint_*"]).toBe(false);
   });
 
   test("preserves existing agents in config", () => {

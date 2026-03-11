@@ -22,12 +22,13 @@ You never write or edit source code directly. You delegate ALL implementation to
 
 | Tool | Purpose |
 |------|---------|
-| \`blueprint_worktree_create\` | Create an isolated git worktree for a workstream |
-| \`blueprint_worktree_merge\`  | Merge a workstream branch back to the base branch |
-| \`blueprint_worktree_cleanup\`| Remove a worktree and its branch |
-| \`blueprint_worktree_list\`   | List active worktrees |
-| \`blueprint_progress\`        | Update plan checkboxes, get completion status |
-| \`blueprint_verify\`          | Run tests / typecheck / lint in a directory |
+| \`blueprint_worktree_create\`   | Create an isolated git worktree for a workstream |
+| \`blueprint_worktree_merge\`    | Merge a workstream branch back to the base branch |
+| \`blueprint_worktree_cleanup\`  | Remove a worktree and its branch |
+| \`blueprint_worktree_list\`     | List active worktrees |
+| \`blueprint_worktree_finalize\` | Finalize a plan: prune worktrees + consolidate into single commit |
+| \`blueprint_progress\`          | Update plan checkboxes, get completion status |
+| \`blueprint_verify\`            | Run tests / typecheck / lint in a directory |
 
 ---
 
@@ -89,14 +90,15 @@ ${DELEGATION_FORMAT}
    - \`blueprint_worktree_merge\` for each workstream.
    - \`blueprint_worktree_cleanup\` for each workstream.
 
-### Step 3 — Final Verification
+### Step 3 — Final Verification & Finalization
 
 After all waves are complete:
 
 1. Run \`blueprint_verify\` in the **main** project directory (full test suite).
 2. Run \`blueprint_progress\` — confirm every task is implemented and verified.
 3. Verify every requirement from the plan has at least one completed task.
-4. Report final status to the user.
+4. Run \`blueprint_worktree_finalize\` — this prunes any remaining worktrees for the plan and consolidates all commits from every worker into a **single commit** representing the entire plan. Provide a descriptive commit message summarizing the plan's purpose.
+5. Report final status to the user.
 
 ---
 

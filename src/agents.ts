@@ -11,6 +11,11 @@ import { workerPrompt } from "./prompts/worker";
 export function registerAgents(config: Record<string, any>): void {
   if (!config.agent) config.agent = {};
 
+  // Disable blueprint_* tools globally so they don't consume context for
+  // non-blueprint agents.  Only the orchestrator re-enables them below.
+  if (!config.tools) config.tools = {};
+  config.tools["blueprint_*"] = false;
+
   // -- Primary agents (visible in agent switcher) --
 
   config.agent["planner"] = {
@@ -31,6 +36,9 @@ export function registerAgents(config: Record<string, any>): void {
     color: "#10B981",
     description:
       "Execute plans by delegating tasks to workers in isolated worktrees",
+    tools: {
+      "blueprint_*": true,
+    },
   };
 
   // -- Subagents (spawned via Task tool, not in switcher) --

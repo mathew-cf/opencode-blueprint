@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import { WORKSPACE_DIR, WORKTREES_DIR, WORKTREE_CHECKOUTS_DIR } from "../constants";
+import type { PlanMetadata } from "../types";
 
 const execAsync = promisify(exec);
 
@@ -15,12 +16,31 @@ function metadataPath(repoRoot: string, planName: string, workstream: string): s
   return path.join(metadataDir(repoRoot), `${planName}-${workstream}.json`);
 }
 
+function planMetadataPath(repoRoot: string, planName: string): string {
+  return path.join(metadataDir(repoRoot), `_plan_${planName}.json`);
+}
+
 function worktreePath(repoRoot: string, planName: string, workstream: string): string {
   return path.join(repoRoot, WORKTREE_CHECKOUTS_DIR, `${planName}-${workstream}`);
 }
 
 function branchName(planName: string, workstream: string): string {
   return `blueprint/${planName}/${workstream}`;
+}
+
+async function readPlanMetadata(repoRoot: string, planName: string): Promise<PlanMetadata | null> {
+  try {
+    const raw = await fs.readFile(planMetadataPath(repoRoot, planName), "utf-8");
+    return JSON.parse(raw) as PlanMetadata;
+  } catch {
+    return null;
+  }
+}
+
+async function writePlanMetadata(repoRoot: string, meta: PlanMetadata): Promise<void> {
+  const dir = metadataDir(repoRoot);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(planMetadataPath(repoRoot, meta.planName), JSON.stringify(meta, null, 2));
 }
 
 export function createWorktreeTools() {
@@ -47,6 +67,18 @@ export function createWorktreeTools() {
 
         try {
           const baseRef = args.baseBranch || "HEAD";
+
+          // Record the base SHA for this plan if not already recorded
+          const existingPlanMeta = await readPlanMetadata(repoRoot, args.planName);
+          if (!existingPlanMeta) {
+            const { stdout: sha } = await execAsync("git rev-parse HEAD", { cwd: repoRoot });
+            await writePlanMetadata(repoRoot, {
+              planName: args.planName,
+              baseSha: sha.trim(),
+              createdAt: new Date().toISOString(),
+            });
+          }
+
           await execAsync(
             `git worktree add "${wtPath}" -b "${branch}" ${baseRef}`,
             { cwd: repoRoot },
@@ -223,6 +255,8 @@ export function createWorktreeTools() {
             const files = await fs.readdir(dir);
             for (const file of files) {
               if (!file.endsWith(".json")) continue;
+              // Skip plan-level metadata files
+              if (file.startsWith("_plan_")) continue;
               if (args.planName && !file.startsWith(args.planName)) continue;
               const raw = await fs.readFile(path.join(dir, file), "utf-8");
               metadata.push(JSON.parse(raw));
@@ -245,6 +279,136 @@ export function createWorktreeTools() {
           return result;
         } catch (err: any) {
           return `Error listing worktrees: ${err.message}`;
+        }
+      },
+    }),
+
+    blueprint_worktree_finalize: tool({
+      description:
+        "Finalize a plan: prune all remaining worktrees for the plan and consolidate all commits since the plan started into a single commit.",
+      args: {
+        planName: tool.schema
+          .string()
+          .describe("Name of the plan to finalize"),
+        commitMessage: tool.schema
+          .string()
+          .optional()
+          .describe(
+            "Commit message for the consolidated commit. Defaults to 'blueprint: <planName>'.",
+          ),
+      },
+      async execute(args, ctx) {
+        const repoRoot = ctx.worktree;
+        const results: string[] = [];
+
+        try {
+          // 1. Read plan metadata to get the base SHA
+          const planMeta = await readPlanMetadata(repoRoot, args.planName);
+          if (!planMeta) {
+            return `Error: no plan metadata found for "${args.planName}". Was blueprint_worktree_create ever called for this plan?`;
+          }
+
+          // 2. Prune all worktrees belonging to this plan
+          const dir = metadataDir(repoRoot);
+          let files: string[] = [];
+          try {
+            files = await fs.readdir(dir);
+          } catch {
+            // No metadata directory
+          }
+
+          for (const file of files) {
+            if (!file.endsWith(".json") || file.startsWith("_plan_")) continue;
+            if (!file.startsWith(`${args.planName}-`)) continue;
+
+            const raw = await fs.readFile(path.join(dir, file), "utf-8");
+            const meta = JSON.parse(raw);
+            if (meta.status === "removed") continue;
+
+            const wtPath = meta.path;
+            const branch = meta.branch;
+
+            // Remove worktree
+            try {
+              await execAsync(`git worktree remove "${wtPath}" --force`, {
+                cwd: repoRoot,
+              });
+              results.push(`Removed worktree: ${wtPath}`);
+            } catch {
+              try {
+                await execAsync("git worktree prune", { cwd: repoRoot });
+                results.push(`Pruned stale worktree: ${wtPath}`);
+              } catch {}
+            }
+
+            // Delete branch
+            try {
+              await execAsync(`git branch -D "${branch}"`, { cwd: repoRoot });
+              results.push(`Deleted branch: ${branch}`);
+            } catch {}
+
+            // Update metadata
+            meta.status = "removed";
+            meta.removedAt = new Date().toISOString();
+            await fs.writeFile(path.join(dir, file), JSON.stringify(meta, null, 2));
+          }
+
+          // Run a final worktree prune to clean up any stale refs
+          try {
+            await execAsync("git worktree prune", { cwd: repoRoot });
+          } catch {}
+
+          // 3. Consolidate commits into a single commit
+          const { stdout: currentSha } = await execAsync("git rev-parse HEAD", {
+            cwd: repoRoot,
+          });
+
+          if (currentSha.trim() === planMeta.baseSha) {
+            results.push("No new commits to consolidate.");
+          } else {
+            // Check that there are actual changes between base and HEAD
+            const { stdout: diffStat } = await execAsync(
+              `git diff --stat "${planMeta.baseSha}" HEAD`,
+              { cwd: repoRoot },
+            );
+
+            if (!diffStat.trim()) {
+              results.push("No file changes to consolidate.");
+            } else {
+              const message =
+                args.commitMessage || `blueprint: ${args.planName}`;
+
+              // Soft-reset to the base SHA (keeps all changes staged)
+              await execAsync(`git reset --soft "${planMeta.baseSha}"`, {
+                cwd: repoRoot,
+              });
+
+              // Create a single consolidated commit
+              await execAsync(`git commit -m "${message.replace(/"/g, '\\"')}"`, {
+                cwd: repoRoot,
+              });
+
+              const { stdout: newSha } = await execAsync(
+                "git rev-parse --short HEAD",
+                { cwd: repoRoot },
+              );
+
+              results.push(
+                `Consolidated commits into single commit: ${newSha.trim()} "${message}"`,
+              );
+            }
+          }
+
+          // 4. Clean up plan metadata file
+          try {
+            await fs.unlink(planMetadataPath(repoRoot, args.planName));
+          } catch {}
+
+          return results.length > 0
+            ? results.join("\n")
+            : "Plan finalized (nothing to clean up).";
+        } catch (err: any) {
+          return `Error finalizing plan: ${err.message}`;
         }
       },
     }),
