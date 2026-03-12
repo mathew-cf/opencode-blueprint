@@ -73,7 +73,7 @@ After the investigation report is saved:
    c. If the reviewer returns **CRITICAL** or **WARNING** issues → revise the plan to address them, update the draft, and loop back to (a).
    d. After ${MAX_REVIEW_CYCLES} cycles, exit the loop regardless and note any unresolved issues.
 6. Present the plan summary and final reviewer feedback to the user. If any reviewer issues remain unresolved, flag them explicitly.
-7. After user approval, save to \`${PLANS_DIR}/{name}.md\` and delete the draft.
+7. After user approval, call the **blueprint_plan_finalize** tool with the plan name. This moves the draft to \`${PLANS_DIR}/{name}.md\` and deletes the draft atomically.
 8. **Hand off to the Orchestrator.** Tell the user the plan is ready for execution and instruct them to run \`/execute {plan-name}\` to begin.
 
 ---

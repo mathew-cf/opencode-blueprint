@@ -106,6 +106,14 @@ describe("agent registration", () => {
     }
   });
 
+  test("planner has blueprint_plan_finalize enabled", () => {
+    const config: Record<string, any> = {};
+    registerAgents(config);
+
+    expect(config.agent.planner.tools).toBeDefined();
+    expect(config.agent.planner.tools.blueprint_plan_finalize).toBe(true);
+  });
+
   test("global blueprint disable preserves existing tools config", () => {
     const config: Record<string, any> = {
       tools: { my_custom_tool: true },

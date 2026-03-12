@@ -22,7 +22,7 @@ describe("plugin entry point", () => {
     expect(hooks).toHaveProperty("event");
   });
 
-  test("registers all 7 tools", async () => {
+  test("registers all 8 tools", async () => {
     const hooks = await BlueprintPlugin(mockInput);
     const toolNames = Object.keys(hooks.tool!);
 
@@ -33,7 +33,8 @@ describe("plugin entry point", () => {
     expect(toolNames).toContain("blueprint_worktree_finalize");
     expect(toolNames).toContain("blueprint_progress");
     expect(toolNames).toContain("blueprint_verify");
-    expect(toolNames).toHaveLength(7);
+    expect(toolNames).toContain("blueprint_plan_finalize");
+    expect(toolNames).toHaveLength(8);
   });
 
   test("all tools have description and execute", async () => {

@@ -5,6 +5,7 @@ import { registerCommands } from "./commands";
 import { createWorktreeTools } from "./tools/worktree";
 import { createProgressTools } from "./tools/progress";
 import { createVerifyTools } from "./tools/verify";
+import { createPlanTools } from "./tools/plan";
 import {
   createChatMessageHook,
   createGuardrailHook,
@@ -19,6 +20,7 @@ const BlueprintPlugin: Plugin = async (input) => {
     ...createWorktreeTools(),
     ...createProgressTools(),
     ...createVerifyTools(),
+    ...createPlanTools(),
   };
 
   return {

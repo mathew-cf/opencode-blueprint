@@ -26,6 +26,9 @@ export function registerAgents(config: Record<string, any>): void {
     color: "#3B82F6",
     description:
       "Investigate codebases and create structured implementation plans",
+    tools: {
+      blueprint_plan_finalize: true,
+    },
   };
 
   config.agent["orchestrator"] = {
