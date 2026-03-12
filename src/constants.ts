@@ -20,5 +20,8 @@ export const WRITE_TOOLS = ["write", "edit", "apply_patch", "multi_edit"];
 /** Max retries for a failed worker task before escalating to user */
 export const MAX_RETRIES = 3;
 
+/** Max review cycles before presenting the plan to the user regardless */
+export const MAX_REVIEW_CYCLES = 3;
+
 /** Minimum lines in a delegation prompt — thin prompts produce failed tasks */
 export const MIN_DELEGATION_LINES = 30;

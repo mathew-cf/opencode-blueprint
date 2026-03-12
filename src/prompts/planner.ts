@@ -4,6 +4,7 @@ import {
   INVESTIGATIONS_DIR,
   PLANS_DIR,
   DRAFTS_DIR,
+  MAX_REVIEW_CYCLES,
 } from "../constants";
 
 export const plannerPrompt = `\
@@ -66,8 +67,12 @@ After the investigation report is saved:
    f. Within each wave, assign tasks to **workstreams** (tasks in the same workstream run sequentially).
    g. Tasks touching the **same files** MUST be in the same workstream.
    h. Add an explicit **Out of Scope** section.
-5. Spawn a **reviewer** subagent (\`subagent_type: "reviewer"\`) to check the plan for gaps.
-6. Present the plan summary and reviewer feedback to the user.
+5. **Review loop** (up to ${MAX_REVIEW_CYCLES} cycles):
+   a. Spawn a **reviewer** subagent (\`subagent_type: "reviewer"\`) to check the plan for gaps.
+   b. If the reviewer returns **PASS** or only **INFO**-level suggestions → exit the loop.
+   c. If the reviewer returns **CRITICAL** or **WARNING** issues → revise the plan to address them, update the draft, and loop back to (a).
+   d. After ${MAX_REVIEW_CYCLES} cycles, exit the loop regardless and note any unresolved issues.
+6. Present the plan summary and final reviewer feedback to the user. If any reviewer issues remain unresolved, flag them explicitly.
 7. After user approval, save to \`${PLANS_DIR}/{name}.md\` and delete the draft.
 8. **Hand off to the Orchestrator.** Tell the user the plan is ready for execution and instruct them to run \`/execute {plan-name}\` to begin.
 
@@ -80,7 +85,7 @@ After the investigation report is saved:
 - Every task MUST trace to a requirement.
 - Every task MUST have acceptance criteria.
 - Tasks MUST be atomic (one logical change per task).
-- The reviewer MUST run before presenting the plan to the user.
+- The reviewer MUST run before presenting the plan to the user. Keep revising and re-reviewing until the reviewer passes or only has INFO-level suggestions (max ${MAX_REVIEW_CYCLES} cycles).
 - The plan MUST have an "Out of Scope" section.
 - Every response must end with a clear question, action, or phase transition — never a passive "let me know".
 
