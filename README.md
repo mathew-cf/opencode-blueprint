@@ -92,11 +92,7 @@ Just add it to your OpenCode configuration (`opencode.jsonc`)!
 
 ```jsonc
 {
-  "plugin": {
-    "blueprint": {
-      "module": "@mathew-cf/opencode-blueprint",
-    },
-  },
+  "plugin": ["@mathew-cf/opencode-blueprint"],
 }
 ```
 
