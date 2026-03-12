@@ -24,6 +24,14 @@ function worktreePath(repoRoot: string, planName: string, workstream: string): s
   return path.join(repoRoot, WORKTREE_CHECKOUTS_DIR, `${planName}-${workstream}`);
 }
 
+function planWorktreeCheckoutPath(repoRoot: string, planName: string): string {
+  return path.join(repoRoot, WORKTREE_CHECKOUTS_DIR, planName);
+}
+
+function planBranchName(planName: string): string {
+  return `blueprint/${planName}/_plan`;
+}
+
 function branchName(planName: string, workstream: string): string {
   return `blueprint/${planName}/${workstream}`;
 }
@@ -46,45 +54,117 @@ async function writePlanMetadata(repoRoot: string, meta: PlanMetadata): Promise<
 export function createWorktreeTools() {
   return {
     blueprint_worktree_create: tool({
-      description:
+      description: [
         "Create a git worktree for an isolated workstream. Returns the absolute path to the new worktree directory.",
+        "",
+        "When called WITHOUT a workstream, creates a plan-level worktree that acts as the",
+        "orchestrator's isolated execution base. All workstream merges target this worktree.",
+        "Idempotent: returns the existing path if the plan worktree already exists.",
+        "",
+        "When called WITH a workstream, creates a workstream worktree branched from the",
+        "plan branch. The plan worktree must already exist.",
+      ].join("\n"),
       args: {
         planName: tool.schema
           .string()
           .describe("Name of the plan this workstream belongs to"),
         workstream: tool.schema
           .string()
-          .describe("Workstream identifier (e.g., ws1, ws2)"),
+          .optional()
+          .describe(
+            "Workstream identifier (e.g., ws1, ws2). Omit to create the plan-level worktree.",
+          ),
         baseBranch: tool.schema
           .string()
           .optional()
-          .describe("Branch to base the worktree on. Defaults to current HEAD."),
+          .describe(
+            "Branch to base the worktree on. For plan worktrees, defaults to current HEAD. " +
+            "For workstream worktrees, defaults to the plan branch.",
+          ),
       },
       async execute(args, ctx) {
         const repoRoot = ctx.worktree;
-        const wtPath = worktreePath(repoRoot, args.planName, args.workstream);
-        const branch = branchName(args.planName, args.workstream);
 
         try {
-          const baseRef = args.baseBranch || "HEAD";
+          // ── Plan worktree creation (no workstream) ───────────────────────
+          if (!args.workstream) {
+            const existingPlanMeta = await readPlanMetadata(repoRoot, args.planName);
 
-          // Record the base SHA for this plan if not already recorded
-          const existingPlanMeta = await readPlanMetadata(repoRoot, args.planName);
-          if (!existingPlanMeta) {
+            // Idempotent: if plan worktree already exists, return its path
+            if (existingPlanMeta) {
+              return [
+                `Plan worktree already exists.`,
+                `  Plan worktree path: ${existingPlanMeta.planWorktreePath}`,
+                `  Plan branch: ${existingPlanMeta.planBranch}`,
+                `  Base branch: ${existingPlanMeta.baseBranch}`,
+                ``,
+                `Use this plan worktree path for \`blueprint_verify\` and code review commands.`,
+              ].join("\n");
+            }
+
+            const planWtPath = planWorktreeCheckoutPath(repoRoot, args.planName);
+            const planBranch = planBranchName(args.planName);
+            const baseRef = args.baseBranch || "HEAD";
+
+            // Record current state
             const { stdout: sha } = await execAsync("git rev-parse HEAD", { cwd: repoRoot });
+            const { stdout: currentBranchRaw } = await execAsync(
+              "git branch --show-current",
+              { cwd: repoRoot },
+            );
+            // Detached HEAD fallback: use the SHA itself
+            const currentBranch = currentBranchRaw.trim() || sha.trim();
+
+            // Create the plan-level worktree
+            await execAsync(
+              `git worktree add "${planWtPath}" -b "${planBranch}" ${baseRef}`,
+              { cwd: repoRoot },
+            );
+
+            // Persist plan metadata
             await writePlanMetadata(repoRoot, {
               planName: args.planName,
               baseSha: sha.trim(),
+              baseBranch: currentBranch,
+              planWorktreePath: planWtPath,
+              planBranch,
               createdAt: new Date().toISOString(),
             });
+
+            return [
+              `Plan worktree created (isolated execution base).`,
+              `  Plan worktree path: ${planWtPath}`,
+              `  Plan branch: ${planBranch}`,
+              `  Base branch: ${currentBranch}`,
+              `  Base SHA: ${sha.trim()}`,
+              ``,
+              `Use this plan worktree path for \`blueprint_verify\` and code review commands.`,
+              `All workstream merges will target this worktree automatically.`,
+            ].join("\n");
           }
 
+          // ── Workstream worktree creation ─────────────────────────────────
+          const planMeta = await readPlanMetadata(repoRoot, args.planName);
+          if (!planMeta) {
+            return [
+              `Error: no plan worktree exists for "${args.planName}".`,
+              `Call blueprint_worktree_create with only planName (no workstream) first`,
+              `to create the plan-level worktree.`,
+            ].join("\n");
+          }
+
+          const wtPath = worktreePath(repoRoot, args.planName, args.workstream);
+          const branch = branchName(args.planName, args.workstream);
+
+          // Default base to the plan branch so workstreams branch from the plan
+          const baseRef = args.baseBranch || planMeta.planBranch;
+
           await execAsync(
-            `git worktree add "${wtPath}" -b "${branch}" ${baseRef}`,
+            `git worktree add "${wtPath}" -b "${branch}" "${baseRef}"`,
             { cwd: repoRoot },
           );
 
-          // Persist metadata
+          // Persist workstream metadata
           const dir = metadataDir(repoRoot);
           await fs.mkdir(dir, { recursive: true });
           await fs.writeFile(
@@ -108,6 +188,7 @@ export function createWorktreeTools() {
             `  Path: ${wtPath}`,
             `  Branch: ${branch}`,
             `  Workstream: ${args.workstream}`,
+            `  Based on: ${baseRef}`,
             ``,
             `Instruct worker subagents to use this absolute path for all file operations.`,
           ].join("\n");
@@ -119,7 +200,9 @@ export function createWorktreeTools() {
 
     blueprint_worktree_merge: tool({
       description:
-        "Merge a workstream branch back into the current branch. Run this after all tasks in a workstream pass verification.",
+        "Merge a workstream branch back into the plan branch. " +
+        "Runs in the plan worktree (not the main checkout) for concurrency safety. " +
+        "Run this after all tasks in a workstream pass verification.",
       args: {
         planName: tool.schema.string().describe("Name of the plan"),
         workstream: tool.schema
@@ -129,7 +212,7 @@ export function createWorktreeTools() {
           .string()
           .optional()
           .describe(
-            "Branch to merge into. Defaults to the current branch of the main checkout.",
+            "Branch to merge into. Defaults to the plan branch.",
           ),
       },
       async execute(args, ctx) {
@@ -137,22 +220,33 @@ export function createWorktreeTools() {
         const branch = branchName(args.planName, args.workstream);
 
         try {
-          const { stdout: currentBranch } = await execAsync(
-            "git branch --show-current",
-            { cwd: repoRoot },
-          );
-          const target = args.targetBranch || currentBranch.trim();
+          // Resolve the plan worktree — merge happens there, not in the main checkout
+          const planMeta = await readPlanMetadata(repoRoot, args.planName);
+          const mergeDir = planMeta?.planWorktreePath || repoRoot;
+          const target = args.targetBranch || planMeta?.planBranch;
 
-          // Ensure we're on the target
-          await execAsync(`git checkout "${target}"`, { cwd: repoRoot });
+          let mergeTarget: string;
+          if (!target) {
+            const { stdout: currentBranch } = await execAsync(
+              "git branch --show-current",
+              { cwd: mergeDir },
+            );
+            // fallback: merge into whatever branch the merge dir is on
+            mergeTarget = currentBranch.trim();
+          } else {
+            mergeTarget = target;
+          }
+
+          // Ensure we're on the target branch in the plan worktree
+          await execAsync(`git checkout "${mergeTarget}"`, { cwd: mergeDir });
 
           // Merge
           const { stdout } = await execAsync(
             `git merge "${branch}" --no-edit`,
-            { cwd: repoRoot },
+            { cwd: mergeDir },
           );
 
-          // Update metadata
+          // Update workstream metadata
           try {
             const mp = metadataPath(repoRoot, args.planName, args.workstream);
             const raw = await fs.readFile(mp, "utf-8");
@@ -164,7 +258,13 @@ export function createWorktreeTools() {
             // metadata file may not exist — non-fatal
           }
 
-          return `Merged ${branch} into ${target}:\n${stdout}`;
+          return [
+            `Merged ${branch} into ${mergeTarget}:`,
+            stdout,
+            planMeta ? `(merged in plan worktree: ${mergeDir})` : "",
+          ]
+            .filter(Boolean)
+            .join("\n");
         } catch (err: any) {
           if (err.message?.includes("CONFLICT")) {
             return (
@@ -248,18 +348,27 @@ export function createWorktreeTools() {
             cwd: repoRoot,
           });
 
-          // Read Blueprint metadata
+          // Read plan-level metadata
           const dir = metadataDir(repoRoot);
-          const metadata: any[] = [];
+          const planMetas: PlanMetadata[] = [];
+          const workstreamMetas: any[] = [];
+
           try {
             const files = await fs.readdir(dir);
             for (const file of files) {
               if (!file.endsWith(".json")) continue;
-              // Skip plan-level metadata files
-              if (file.startsWith("_plan_")) continue;
-              if (args.planName && !file.startsWith(args.planName)) continue;
-              const raw = await fs.readFile(path.join(dir, file), "utf-8");
-              metadata.push(JSON.parse(raw));
+
+              if (file.startsWith("_plan_")) {
+                // Plan metadata
+                if (args.planName && !file.includes(args.planName)) continue;
+                const raw = await fs.readFile(path.join(dir, file), "utf-8");
+                planMetas.push(JSON.parse(raw));
+              } else {
+                // Workstream metadata
+                if (args.planName && !file.startsWith(args.planName)) continue;
+                const raw = await fs.readFile(path.join(dir, file), "utf-8");
+                workstreamMetas.push(JSON.parse(raw));
+              }
             }
           } catch {
             // No metadata directory yet
@@ -267,13 +376,22 @@ export function createWorktreeTools() {
 
           let result = `## Git Worktrees\n\`\`\`\n${stdout}\`\`\`\n`;
 
-          if (metadata.length > 0) {
+          if (planMetas.length > 0) {
+            result += `\n## Blueprint Plans\n`;
+            for (const p of planMetas) {
+              result += `- **${p.planName}** (plan worktree): \`${p.planWorktreePath}\` [${p.planBranch}] base: ${p.baseBranch}\n`;
+            }
+          }
+
+          if (workstreamMetas.length > 0) {
             result += `\n## Blueprint Workstreams\n`;
-            for (const m of metadata) {
+            for (const m of workstreamMetas) {
               result += `- **${m.planName}/${m.workstream}** (${m.status}): \`${m.path}\` [${m.branch}]\n`;
             }
-          } else {
-            result += "\nNo Blueprint workstream metadata found.\n";
+          }
+
+          if (planMetas.length === 0 && workstreamMetas.length === 0) {
+            result += "\nNo Blueprint metadata found.\n";
           }
 
           return result;
@@ -284,8 +402,12 @@ export function createWorktreeTools() {
     }),
 
     blueprint_worktree_finalize: tool({
-      description:
-        "Finalize a plan: prune all remaining worktrees for the plan and consolidate all commits since the plan started into a single commit.",
+      description: [
+        "Finalize a plan: prune all remaining worktrees for the plan,",
+        "consolidate all commits on the plan branch into a single commit,",
+        "merge the plan branch back into the original base branch, and",
+        "clean up the plan worktree.",
+      ].join(" "),
       args: {
         planName: tool.schema
           .string()
@@ -302,13 +424,17 @@ export function createWorktreeTools() {
         const results: string[] = [];
 
         try {
-          // 1. Read plan metadata to get the base SHA
+          // 1. Read plan metadata
           const planMeta = await readPlanMetadata(repoRoot, args.planName);
           if (!planMeta) {
             return `Error: no plan metadata found for "${args.planName}". Was blueprint_worktree_create ever called for this plan?`;
           }
 
-          // 2. Prune all worktrees belonging to this plan
+          const planWtPath = planMeta.planWorktreePath;
+          const planBranch = planMeta.planBranch;
+          const baseBranch = planMeta.baseBranch;
+
+          // 2. Prune all workstream worktrees belonging to this plan
           const dir = metadataDir(repoRoot);
           let files: string[] = [];
           try {
@@ -353,23 +479,22 @@ export function createWorktreeTools() {
             await fs.writeFile(path.join(dir, file), JSON.stringify(meta, null, 2));
           }
 
-          // Run a final worktree prune to clean up any stale refs
+          // Run a final worktree prune
           try {
             await execAsync("git worktree prune", { cwd: repoRoot });
           } catch {}
 
-          // 3. Consolidate commits into a single commit
-          const { stdout: currentSha } = await execAsync("git rev-parse HEAD", {
-            cwd: repoRoot,
+          // 3. Consolidate commits on the plan branch (in the plan worktree)
+          const { stdout: planHeadSha } = await execAsync("git rev-parse HEAD", {
+            cwd: planWtPath,
           });
 
-          if (currentSha.trim() === planMeta.baseSha) {
-            results.push("No new commits to consolidate.");
+          if (planHeadSha.trim() === planMeta.baseSha) {
+            results.push("No new commits to consolidate on plan branch.");
           } else {
-            // Check that there are actual changes between base and HEAD
             const { stdout: diffStat } = await execAsync(
               `git diff --stat "${planMeta.baseSha}" HEAD`,
-              { cwd: repoRoot },
+              { cwd: planWtPath },
             );
 
             if (!diffStat.trim()) {
@@ -380,17 +505,18 @@ export function createWorktreeTools() {
 
               // Soft-reset to the base SHA (keeps all changes staged)
               await execAsync(`git reset --soft "${planMeta.baseSha}"`, {
-                cwd: repoRoot,
+                cwd: planWtPath,
               });
 
               // Create a single consolidated commit
-              await execAsync(`git commit -m "${message.replace(/"/g, '\\"')}"`, {
-                cwd: repoRoot,
-              });
+              await execAsync(
+                `git commit -m "${message.replace(/"/g, '\\"')}"`,
+                { cwd: planWtPath },
+              );
 
               const { stdout: newSha } = await execAsync(
                 "git rev-parse --short HEAD",
-                { cwd: repoRoot },
+                { cwd: planWtPath },
               );
 
               results.push(
@@ -399,7 +525,48 @@ export function createWorktreeTools() {
             }
           }
 
-          // 4. Clean up plan metadata file
+          // 4. Merge the plan branch into the original base branch (in main checkout)
+          try {
+            // Ensure we're on the base branch
+            await execAsync(`git checkout "${baseBranch}"`, { cwd: repoRoot });
+
+            const { stdout: mergeOutput } = await execAsync(
+              `git merge "${planBranch}" --no-edit`,
+              { cwd: repoRoot },
+            );
+
+            results.push(`Merged ${planBranch} into ${baseBranch}:\n${mergeOutput.trim()}`);
+          } catch (err: any) {
+            if (err.message?.includes("CONFLICT")) {
+              results.push(
+                `Merge conflict merging ${planBranch} into ${baseBranch}.\n` +
+                `Manual resolution required:\n${err.stderr || err.message}`,
+              );
+              // Don't proceed with cleanup on conflict
+              return results.join("\n");
+            }
+            results.push(`Warning merging plan branch to base: ${err.message}`);
+          }
+
+          // 5. Remove the plan worktree and delete the plan branch
+          try {
+            await execAsync(`git worktree remove "${planWtPath}" --force`, {
+              cwd: repoRoot,
+            });
+            results.push(`Removed plan worktree: ${planWtPath}`);
+          } catch {
+            try {
+              await execAsync("git worktree prune", { cwd: repoRoot });
+              results.push(`Pruned plan worktree: ${planWtPath}`);
+            } catch {}
+          }
+
+          try {
+            await execAsync(`git branch -D "${planBranch}"`, { cwd: repoRoot });
+            results.push(`Deleted plan branch: ${planBranch}`);
+          } catch {}
+
+          // 6. Clean up plan metadata file
           try {
             await fs.unlink(planMetadataPath(repoRoot, args.planName));
           } catch {}

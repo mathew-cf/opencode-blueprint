@@ -17,6 +17,12 @@ export interface WorktreeMetadata {
 export interface PlanMetadata {
   planName: string;
   baseSha: string;
+  /** The branch the plan was started from (merge target after finalization) */
+  baseBranch: string;
+  /** Absolute path to the plan-level worktree (orchestrator's isolated execution base) */
+  planWorktreePath: string;
+  /** Branch name for the plan worktree: blueprint/{planName} */
+  planBranch: string;
   createdAt: string;
 }
 

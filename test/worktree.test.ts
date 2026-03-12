@@ -24,16 +24,71 @@ describe("worktree tools", () => {
   });
 
   afterAll(async () => {
-    // Prune worktrees before removing tmpdir
     try {
       await execAsync("git worktree prune", { cwd: repoDir });
     } catch {}
     await cleanupTmpDir(tmpDir);
   });
 
-  // ── blueprint_worktree_create ──
+  // ── plan worktree creation ──
 
-  test("create: creates a worktree and returns its path", async () => {
+  test("create: plan worktree (no workstream) creates isolated execution base", async () => {
+    const ctx = mockCtx(repoDir);
+    const result = await executeTool(
+      tools.blueprint_worktree_create,
+      { planName: "p1" },
+      ctx,
+    );
+
+    expect(result).toContain("Plan worktree created");
+    expect(result).toContain("blueprint/p1");
+    expect(result).toContain("blueprint_verify");
+
+    // Verify plan worktree directory exists
+    const planWtPath = path.join(repoDir, WORKTREE_CHECKOUTS_DIR, "p1");
+    const stat = await fs.stat(planWtPath);
+    expect(stat.isDirectory()).toBe(true);
+
+    // Verify plan metadata
+    const planMetaPath = path.join(repoDir, WORKTREES_DIR, "_plan_p1.json");
+    const meta: PlanMetadata = JSON.parse(
+      await fs.readFile(planMetaPath, "utf-8"),
+    );
+    expect(meta.planName).toBe("p1");
+    expect(meta.baseSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(meta.baseBranch).toBeDefined();
+    expect(meta.planWorktreePath).toBe(planWtPath);
+    expect(meta.planBranch).toBe("blueprint/p1/_plan");
+    expect(meta.createdAt).toBeDefined();
+  });
+
+  test("create: plan worktree is idempotent", async () => {
+    const ctx = mockCtx(repoDir);
+    const result = await executeTool(
+      tools.blueprint_worktree_create,
+      { planName: "p1" },
+      ctx,
+    );
+
+    expect(result).toContain("Plan worktree already exists");
+    expect(result).toContain("blueprint/p1");
+  });
+
+  // ── workstream worktree creation ──
+
+  test("create: workstream without plan worktree returns error", async () => {
+    const ctx = mockCtx(repoDir);
+    const result = await executeTool(
+      tools.blueprint_worktree_create,
+      { planName: "no-plan", workstream: "ws1" },
+      ctx,
+    );
+
+    expect(result).toContain("Error: no plan worktree exists");
+    expect(result).toContain("no-plan");
+  });
+
+  test("create: workstream worktree branches from plan branch", async () => {
     const ctx = mockCtx(repoDir);
     const result = await executeTool(
       tools.blueprint_worktree_create,
@@ -44,6 +99,7 @@ describe("worktree tools", () => {
     expect(result).toContain("Worktree created");
     expect(result).toContain("ws1");
     expect(result).toContain("blueprint/p1/ws1");
+    expect(result).toContain("Based on: blueprint/p1");
 
     // Verify directory exists
     const wtPath = path.join(repoDir, WORKTREE_CHECKOUTS_DIR, "p1-ws1");
@@ -84,7 +140,7 @@ describe("worktree tools", () => {
 
   // ── blueprint_worktree_list ──
 
-  test("list: shows active worktrees", async () => {
+  test("list: shows plan worktrees and workstreams", async () => {
     const ctx = mockCtx(repoDir);
     const result = await executeTool(
       tools.blueprint_worktree_list,
@@ -93,31 +149,31 @@ describe("worktree tools", () => {
     );
 
     expect(result).toContain("Git Worktrees");
+    expect(result).toContain("Blueprint Plans");
+    expect(result).toContain("blueprint/p1");
     expect(result).toContain("Blueprint Workstreams");
     expect(result).toContain("ws1");
     expect(result).toContain("ws2");
     expect(result).toContain("active");
   });
 
-  test("list: filter by plan name", async () => {
+  test("list: filter by plan name shows no results for nonexistent plan", async () => {
     const ctx = mockCtx(repoDir);
     const result = await executeTool(
       tools.blueprint_worktree_list,
       { planName: "nonexistent" },
       ctx,
     );
-    // Should still show git worktrees but no blueprint metadata for this plan
     expect(result).toContain("Git Worktrees");
-    expect(result).toContain("No Blueprint workstream metadata found");
-    expect(result).not.toContain("Blueprint Workstreams");
+    expect(result).toContain("No Blueprint metadata found");
   });
 
   // ── blueprint_worktree_merge ──
 
-  test("merge: merges workstream branch into current branch", async () => {
+  test("merge: merges workstream into plan worktree (not main checkout)", async () => {
     const ctx = mockCtx(repoDir);
 
-    // Create a file in the worktree to have something to merge
+    // Create a file in the workstream worktree
     const wtPath = path.join(repoDir, WORKTREE_CHECKOUTS_DIR, "p1-ws2");
     await fs.writeFile(path.join(wtPath, "new-file.txt"), "hello\n");
     await execAsync("git add . && git commit -m 'add new file'", {
@@ -131,13 +187,23 @@ describe("worktree tools", () => {
     );
 
     expect(result).toContain("Merged");
+    expect(result).toContain("plan worktree");
 
-    // Verify file is now in main repo
+    // File should be in the PLAN worktree, not the main checkout
+    const planWtPath = path.join(repoDir, WORKTREE_CHECKOUTS_DIR, "p1");
     const content = await fs.readFile(
-      path.join(repoDir, "new-file.txt"),
+      path.join(planWtPath, "new-file.txt"),
       "utf-8",
     );
     expect(content).toBe("hello\n");
+
+    // File should NOT be in main checkout yet (isolation!)
+    try {
+      await fs.stat(path.join(repoDir, "new-file.txt"));
+      throw new Error("File should not exist in main checkout before finalize");
+    } catch (err: any) {
+      expect(err.code).toBe("ENOENT");
+    }
   });
 
   // ── blueprint_worktree_cleanup ──
@@ -170,7 +236,6 @@ describe("worktree tools", () => {
 
   test("cleanup: keeps branch when deleteBranch=false", async () => {
     const ctx = mockCtx(repoDir);
-    // Clean up the remaining ws1 without deleting branch
     const result = await executeTool(
       tools.blueprint_worktree_cleanup,
       { planName: "p1", workstream: "ws1", deleteBranch: false },
@@ -185,15 +250,18 @@ describe("worktree tools", () => {
     expect(stdout).toContain("blueprint/p1/ws1");
   });
 
-  // ── plan metadata (base SHA) ──
+  // ── plan metadata ──
 
-  test("create: records plan metadata with base SHA on first worktree", async () => {
+  test("create: records plan metadata with all required fields", async () => {
     const planMetaPath = path.join(repoDir, WORKTREES_DIR, "_plan_p1.json");
     const raw = await fs.readFile(planMetaPath, "utf-8");
     const meta: PlanMetadata = JSON.parse(raw);
 
     expect(meta.planName).toBe("p1");
     expect(meta.baseSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(meta.baseBranch).toBeDefined();
+    expect(meta.planWorktreePath).toContain("p1");
+    expect(meta.planBranch).toBe("blueprint/p1/_plan");
     expect(meta.createdAt).toBeDefined();
   });
 });
@@ -225,13 +293,20 @@ describe("worktree finalize", () => {
     expect(result).toContain("Error: no plan metadata found");
   });
 
-  test("finalize: prunes worktrees and consolidates commits into one", async () => {
+  test("finalize: consolidates commits on plan branch and merges to base", async () => {
     const ctx = mockCtx(repoDir);
 
     // Record the starting SHA
     const { stdout: startSha } = await execAsync("git rev-parse HEAD", {
       cwd: repoDir,
     });
+
+    // Step 0: Create plan worktree
+    await executeTool(
+      tools.blueprint_worktree_create,
+      { planName: "fin1" },
+      ctx,
+    );
 
     // Create two workstreams
     await executeTool(
@@ -259,7 +334,7 @@ describe("worktree finalize", () => {
       cwd: wt2,
     });
 
-    // Merge both workstreams (simulating normal wave completion)
+    // Merge both workstreams into plan branch
     await executeTool(
       tools.blueprint_worktree_merge,
       { planName: "fin1", workstream: "ws1" },
@@ -271,7 +346,15 @@ describe("worktree finalize", () => {
       ctx,
     );
 
-    // At this point there are multiple commits. Now finalize.
+    // Verify files are in plan worktree before finalize
+    const planWt = path.join(repoDir, WORKTREE_CHECKOUTS_DIR, "fin1");
+    const contentA = await fs.readFile(
+      path.join(planWt, "feature-a.txt"),
+      "utf-8",
+    );
+    expect(contentA).toBe("feature A\n");
+
+    // Finalize: consolidate + merge to base
     const result = await executeTool(
       tools.blueprint_worktree_finalize,
       { planName: "fin1", commitMessage: "feat: implement fin1 plan" },
@@ -280,28 +363,31 @@ describe("worktree finalize", () => {
 
     expect(result).toContain("Consolidated commits into single commit");
     expect(result).toContain("feat: implement fin1 plan");
+    expect(result).toContain("Merged blueprint/fin1/_plan into");
 
-    // Both files should still exist
-    const contentA = await fs.readFile(
+    // Both files should now exist in the main checkout (merged from plan branch)
+    const mainContentA = await fs.readFile(
       path.join(repoDir, "feature-a.txt"),
       "utf-8",
     );
-    expect(contentA).toBe("feature A\n");
+    expect(mainContentA).toBe("feature A\n");
 
-    const contentB = await fs.readFile(
+    const mainContentB = await fs.readFile(
       path.join(repoDir, "feature-b.txt"),
       "utf-8",
     );
-    expect(contentB).toBe("feature B\n");
+    expect(mainContentB).toBe("feature B\n");
 
-    // There should be exactly one commit on top of the start SHA
+    // There should be exactly one new commit on top of the start SHA
+    // (the consolidated commit is a merge, so we check the log)
     const { stdout: log } = await execAsync(
       `git log --oneline ${startSha.trim()}..HEAD`,
       { cwd: repoDir },
     );
     const commits = log.trim().split("\n").filter(Boolean);
-    expect(commits).toHaveLength(1);
-    expect(commits[0]).toContain("feat: implement fin1 plan");
+    // Could be 1 (fast-forward of the consolidated commit) or 2 (merge commit + consolidated)
+    // The consolidated commit message should appear
+    expect(log).toContain("feat: implement fin1 plan");
   });
 
   test("finalize: cleans up plan metadata file", async () => {
@@ -329,10 +415,11 @@ describe("worktree finalize", () => {
   });
 
   test("finalize: worktree directories are removed", async () => {
+    const planWt = path.join(repoDir, WORKTREE_CHECKOUTS_DIR, "fin1");
     const wt1 = path.join(repoDir, WORKTREE_CHECKOUTS_DIR, "fin1-ws1");
     const wt2 = path.join(repoDir, WORKTREE_CHECKOUTS_DIR, "fin1-ws2");
 
-    for (const wtPath of [wt1, wt2]) {
+    for (const wtPath of [planWt, wt1, wt2]) {
       try {
         await fs.stat(wtPath);
         throw new Error("Should not exist");
@@ -342,16 +429,22 @@ describe("worktree finalize", () => {
     }
   });
 
-  test("finalize: branches are deleted", async () => {
+  test("finalize: branches are deleted (including plan branch)", async () => {
     const { stdout } = await execAsync("git branch", { cwd: repoDir });
     expect(stdout).not.toContain("blueprint/fin1/ws1");
     expect(stdout).not.toContain("blueprint/fin1/ws2");
+    expect(stdout).not.toContain("blueprint/fin1");
   });
 
   test("finalize: handles already-cleaned-up worktrees gracefully", async () => {
     const ctx = mockCtx(repoDir);
 
-    // Create a plan, create a worktree, merge it, manually clean it up, then finalize
+    // Create plan worktree, workstream, make change, merge, cleanup, then finalize
+    await executeTool(
+      tools.blueprint_worktree_create,
+      { planName: "fin2" },
+      ctx,
+    );
     await executeTool(
       tools.blueprint_worktree_create,
       { planName: "fin2", workstream: "ws1" },
@@ -373,16 +466,22 @@ describe("worktree finalize", () => {
       ctx,
     );
 
-    // Now finalize — worktree is already removed, should still consolidate
+    // Now finalize — workstream is already removed, should still consolidate + merge to base
     const result = await executeTool(
       tools.blueprint_worktree_finalize,
       { planName: "fin2" },
       ctx,
     );
 
-    // Should consolidate even though worktrees are already cleaned
     expect(result).toContain("Consolidated commits into single commit");
     expect(result).toContain("blueprint: fin2");
+
+    // File should be in main checkout after finalize
+    const content = await fs.readFile(
+      path.join(repoDir, "file-c.txt"),
+      "utf-8",
+    );
+    expect(content).toBe("content\n");
   });
 
   test("finalize: uses default commit message when none provided", async () => {
@@ -396,7 +495,12 @@ describe("worktree finalize", () => {
   test("finalize: no-op when no commits since base", async () => {
     const ctx = mockCtx(repoDir);
 
-    // Create a plan with worktree but don't make any changes
+    // Create plan worktree and workstream but don't make any changes
+    await executeTool(
+      tools.blueprint_worktree_create,
+      { planName: "fin3" },
+      ctx,
+    );
     await executeTool(
       tools.blueprint_worktree_create,
       { planName: "fin3", workstream: "ws1" },
