@@ -2,15 +2,16 @@ import { describe, test, expect } from "bun:test";
 import { registerAgents } from "../src/agents";
 
 describe("agent registration", () => {
-  test("registers all 5 agents on empty config", () => {
+  test("registers all 6 agents on empty config", () => {
     const config: Record<string, any> = {};
     registerAgents(config);
 
-    expect(Object.keys(config.agent)).toHaveLength(5);
+    expect(Object.keys(config.agent)).toHaveLength(6);
     expect(config.agent).toHaveProperty("planner");
     expect(config.agent).toHaveProperty("orchestrator");
     expect(config.agent).toHaveProperty("investigator");
-    expect(config.agent).toHaveProperty("reviewer");
+    expect(config.agent).toHaveProperty("reviewer-completeness");
+    expect(config.agent).toHaveProperty("reviewer-structure");
     expect(config.agent).toHaveProperty("worker");
   });
 
@@ -27,7 +28,8 @@ describe("agent registration", () => {
     registerAgents(config);
 
     expect(config.agent.investigator.mode).toBe("subagent");
-    expect(config.agent.reviewer.mode).toBe("subagent");
+    expect(config.agent["reviewer-completeness"].mode).toBe("subagent");
+    expect(config.agent["reviewer-structure"].mode).toBe("subagent");
     expect(config.agent.worker.mode).toBe("subagent");
   });
 
@@ -56,38 +58,10 @@ describe("agent registration", () => {
     });
   });
 
-<<<<<<< Updated upstream
-  test("reviewer has write, edit, and bash disabled", () => {
-||||||| Stash base
-  test("reviewer-completeness has write, edit, and bash disabled", () => {
-=======
   test("reviewer-completeness is read-only with no bash", () => {
->>>>>>> Stashed changes
     const config: Record<string, any> = {};
     registerAgents(config);
 
-<<<<<<< Updated upstream
-    expect(config.agent.reviewer.tools).toEqual({
-      write: false,
-      edit: false,
-      bash: false,
-||||||| Stash base
-    expect(config.agent["reviewer-completeness"].tools).toEqual({
-      write: false,
-      edit: false,
-      bash: false,
-    });
-  });
-
-  test("reviewer-structure has write, edit, and bash disabled", () => {
-    const config: Record<string, any> = {};
-    registerAgents(config);
-
-    expect(config.agent["reviewer-structure"].tools).toEqual({
-      write: false,
-      edit: false,
-      bash: false,
-=======
     expect(config.agent["reviewer-completeness"].permission).toEqual({
       edit: "deny",
       bash: "deny",
@@ -101,7 +75,6 @@ describe("agent registration", () => {
     expect(config.agent["reviewer-structure"].permission).toEqual({
       edit: "deny",
       bash: "deny",
->>>>>>> Stashed changes
     });
   });
 
@@ -134,24 +107,10 @@ describe("agent registration", () => {
     const config: Record<string, any> = {};
     registerAgents(config);
 
-<<<<<<< Updated upstream
-    // planner, investigator, reviewer, worker should NOT have blueprint_* enabled
-    for (const name of ["planner", "investigator", "reviewer", "worker"]) {
-      const tools = config.agent[name].tools;
-      if (tools) {
-        expect(tools["blueprint_*"]).not.toBe(true);
-||||||| Stash base
-    // planner, investigator, reviewer-completeness, reviewer-structure, worker should NOT have blueprint_* enabled
-    for (const name of ["planner", "investigator", "reviewer-completeness", "reviewer-structure", "worker"]) {
-      const tools = config.agent[name].tools;
-      if (tools) {
-        expect(tools["blueprint_*"]).not.toBe(true);
-=======
     for (const name of ["planner", "investigator", "reviewer-completeness", "reviewer-structure", "worker"]) {
       const perm = config.agent[name].permission;
       if (perm) {
         expect(perm["blueprint_*"]).not.toBe("allow");
->>>>>>> Stashed changes
       }
     }
   });
@@ -184,7 +143,7 @@ describe("agent registration", () => {
 
     expect(config.agent).toHaveProperty("my-custom-agent");
     expect(config.agent).toHaveProperty("planner");
-    expect(Object.keys(config.agent)).toHaveLength(6);
+    expect(Object.keys(config.agent)).toHaveLength(7);
   });
 
   test("planner prompt references .blueprint paths", () => {
@@ -218,5 +177,19 @@ describe("agent registration", () => {
     registerAgents(config);
 
     expect(config.agent.orchestrator.model).toContain("sonnet");
+  });
+
+  test("reviewer-completeness uses opus model", () => {
+    const config: Record<string, any> = {};
+    registerAgents(config);
+
+    expect(config.agent["reviewer-completeness"].model).toContain("opus");
+  });
+
+  test("reviewer-structure uses sonnet model", () => {
+    const config: Record<string, any> = {};
+    registerAgents(config);
+
+    expect(config.agent["reviewer-structure"].model).toContain("sonnet");
   });
 });

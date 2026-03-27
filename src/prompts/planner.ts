@@ -62,15 +62,19 @@ After the investigation report is saved:
       - Lists specific files to modify/create.
       - Has verifiable acceptance criteria.
       - Traces back to a requirement.
+      - **Size rule**: each task touches 1–3 files and addresses a single logical concern. If a task would touch more than 3 files or mix unrelated concerns, split it into smaller tasks.
    d. Map dependencies between tasks.
    e. Group tasks into sequential **waves** (tasks in the same wave can run in parallel).
-   f. Within each wave, assign tasks to **workstreams** (tasks in the same workstream run sequentially).
+   f. Within each wave, assign tasks to **workstreams** (tasks in the same workstream run sequentially). **Maximise the number of workstreams** — every independent task MUST get its own workstream. Do NOT bundle independent tasks into a single workstream to "simplify" the plan; that serialises work that could run in parallel.
    g. Tasks touching the **same files** MUST be in the same workstream.
    h. Add an explicit **Out of Scope** section.
+   i. **Critical path check**: identify the critical path — the longest chain of sequentially dependent tasks from start to finish. List it explicitly and verify it is as short as possible. If any task on the critical path can be split or parallelised to shorten the chain, do so before proceeding.
 5. **Review loop** (up to ${MAX_REVIEW_CYCLES} cycles):
-   a. Spawn a **reviewer** subagent (\`subagent_type: "reviewer"\`) to check the plan for gaps.
-   b. If the reviewer returns **PASS** or only **INFO**-level suggestions → exit the loop.
-   c. If the reviewer returns **CRITICAL** or **WARNING** issues → revise the plan to address them, update the draft, and loop back to (a).
+   a. Spawn both reviewer subagents in a single message (parallel Task calls):
+      - \`subagent_type: "reviewer-completeness"\` — checks requirements coverage, acceptance criteria, missing error handling, missing test updates, scope creep, and Out of Scope completeness.
+      - \`subagent_type: "reviewer-structure"\` — checks task atomicity (>3 files), dependency ordering errors, file conflicts, and critical path minimisation.
+   b. Wait for both to complete. If **both** return **PASS** or only **INFO**-level suggestions → exit the loop.
+   c. If **EITHER** returns **CRITICAL** or **WARNING** issues → revise the plan to address all issues from both reviewers, update the draft, and loop back to (a).
    d. After ${MAX_REVIEW_CYCLES} cycles, exit the loop regardless and note any unresolved issues.
 6. Present the plan summary and final reviewer feedback to the user. If any reviewer issues remain unresolved, flag them explicitly.
 7. After user approval, call the **blueprint_plan_finalize** tool with the plan name. This moves the draft to \`${PLANS_DIR}/{name}.md\` and deletes the draft atomically.
@@ -85,7 +89,7 @@ After the investigation report is saved:
 - Every task MUST trace to a requirement.
 - Every task MUST have acceptance criteria.
 - Tasks MUST be atomic (one logical change per task).
-- The reviewer MUST run before presenting the plan to the user. Keep revising and re-reviewing until the reviewer passes or only has INFO-level suggestions (max ${MAX_REVIEW_CYCLES} cycles).
+- Both reviewers (\`reviewer-completeness\` and \`reviewer-structure\`) MUST run before presenting the plan to the user. Keep revising and re-reviewing until both pass or only have INFO-level suggestions (max ${MAX_REVIEW_CYCLES} cycles).
 - The plan MUST have an "Out of Scope" section.
 - Every response must end with a clear question, action, or phase transition — never a passive "let me know".
 

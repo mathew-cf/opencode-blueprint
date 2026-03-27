@@ -86,6 +86,14 @@ ALL bash commands must set workdir to this path.
 {Relevant notepad entries from .blueprint/notepads/{planName}/}
 {Relevant sections from the investigation report}
 
+## CURRENT FILE CONTENTS
+<!-- If no files are pre-loaded, omit this section entirely. -->
+
+### {file path}
+\`\`\`{lang}
+{contents}
+\`\`\`
+
 ## CONVENTIONS
 {Code patterns and conventions from the investigation report}
 

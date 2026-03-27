@@ -10,22 +10,23 @@ const execAsync = promisify(exec);
 async function detectPackageManager(
   dir: string,
 ): Promise<"bun" | "pnpm" | "yarn" | "npm"> {
-  try {
-    await fs.access(path.join(dir, "bun.lockb"));
-    return "bun";
-  } catch {}
-  try {
-    await fs.access(path.join(dir, "bun.lock"));
-    return "bun";
-  } catch {}
-  try {
-    await fs.access(path.join(dir, "pnpm-lock.yaml"));
-    return "pnpm";
-  } catch {}
-  try {
-    await fs.access(path.join(dir, "yarn.lock"));
-    return "yarn";
-  } catch {}
+  const lockFiles = [
+    { file: "bun.lockb", pm: "bun" as const },
+    { file: "bun.lock", pm: "bun" as const },
+    { file: "pnpm-lock.yaml", pm: "pnpm" as const },
+    { file: "yarn.lock", pm: "yarn" as const },
+  ];
+
+  const results = await Promise.allSettled(
+    lockFiles.map(({ file }) => fs.access(path.join(dir, file))),
+  );
+
+  for (let i = 0; i < results.length; i++) {
+    if (results[i].status === "fulfilled") {
+      return lockFiles[i].pm;
+    }
+  }
+
   return "npm";
 }
 
@@ -53,8 +54,6 @@ export function createVerifyTools() {
           "lint",
           "build",
         ];
-        const results: string[] = [];
-        let allPassed = true;
 
         // Read package.json scripts
         let scripts: Record<string, string> = {};
@@ -77,6 +76,8 @@ export function createVerifyTools() {
                 ? "yarn"
                 : "npx";
 
+        // Resolve commands for all requested checks (sequential — just switch logic + one possible fs.access)
+        const checkCommands: Array<{ check: string; cmd: string | null }> = [];
         for (const check of requestedChecks) {
           let cmd: string | null = null;
 
@@ -107,25 +108,50 @@ export function createVerifyTools() {
               break;
           }
 
-          if (!cmd) {
-            results.push(`- ${check}: skipped (no script found)`);
-            continue;
-          }
+          checkCommands.push({ check, cmd });
+        }
 
-          try {
-            const { stdout, stderr } = await execAsync(cmd, {
+        // Run all non-null commands concurrently via Promise.allSettled
+        const execResults = await Promise.allSettled(
+          checkCommands.map(({ cmd }) => {
+            if (cmd === null) {
+              return Promise.resolve(null);
+            }
+            return execAsync(cmd, {
               cwd: dir,
               timeout: 180_000,
               env: { ...process.env, CI: "true", FORCE_COLOR: "0" },
             });
+          }),
+        );
+
+        // Collect results in original requested order
+        const results: string[] = [];
+        let allPassed = true;
+
+        for (let i = 0; i < checkCommands.length; i++) {
+          const { check } = checkCommands[i];
+          const settled = execResults[i];
+
+          if (settled.status === "fulfilled" && settled.value === null) {
+            results.push(`- ${check}: skipped (no script found)`);
+            continue;
+          }
+
+          if (settled.status === "fulfilled") {
+            const { stdout, stderr } = settled.value as {
+              stdout: string;
+              stderr: string;
+            };
             const output = (stdout + (stderr ? `\n${stderr}` : "")).trim();
             const preview =
               output.length > 500
                 ? output.slice(0, 500) + "\n… (truncated)"
                 : output;
             results.push(`- ${check}: PASSED\n\`\`\`\n${preview}\n\`\`\``);
-          } catch (err: any) {
+          } else {
             allPassed = false;
+            const err = settled.reason as any;
             const output = (
               (err.stdout || "") +
               "\n" +

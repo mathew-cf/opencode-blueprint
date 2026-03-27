@@ -1,7 +1,8 @@
 import { plannerPrompt } from "./prompts/planner";
 import { orchestratorPrompt } from "./prompts/orchestrator";
 import { investigatorPrompt } from "./prompts/investigator";
-import { reviewerPrompt } from "./prompts/reviewer";
+import { reviewerCompletenessPrompt } from "./prompts/reviewer";
+import { reviewerStructurePrompt } from "./prompts/reviewer-structure";
 import { workerPrompt } from "./prompts/worker";
 
 /**
@@ -63,41 +64,13 @@ export function registerAgents(config: Record<string, any>): void {
     },
   };
 
-  config.agent["reviewer"] = {
+  config.agent["reviewer-completeness"] = {
     model: "anthropic/claude-opus-4-6",
     temperature: 0.1,
-    prompt: reviewerPrompt,
+    prompt: reviewerCompletenessPrompt,
     mode: "subagent",
     color: "#F59E0B",
     description:
-<<<<<<< Updated upstream
-      "Review plans and code for gaps, scope creep, and quality issues",
-    tools: {
-      write: false,
-      edit: false,
-      bash: false,
-||||||| Stash base
-      "Review plans and code for requirements completeness and quality gaps",
-    tools: {
-      write: false,
-      edit: false,
-      bash: false,
-    },
-  };
-
-  config.agent["reviewer-structure"] = {
-    model: "anthropic/claude-sonnet-4-6",
-    temperature: 0.1,
-    prompt: reviewerStructurePrompt,
-    mode: "subagent",
-    color: "#14B8A6",
-    description:
-      "Review plans for task atomicity, dependency ordering, and parallelism conflicts",
-    tools: {
-      write: false,
-      edit: false,
-      bash: false,
-=======
       "Review plans and code for requirements completeness and quality gaps",
     // Read-only, no shell: reviews only need to read files and reason.
     permission: {
@@ -118,7 +91,6 @@ export function registerAgents(config: Record<string, any>): void {
     permission: {
       edit: "deny",
       bash: "deny",
->>>>>>> Stashed changes
     },
   };
 

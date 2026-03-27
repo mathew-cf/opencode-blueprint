@@ -106,12 +106,11 @@ export function createWorktreeTools() {
             const planBranch = planBranchName(args.planName);
             const baseRef = args.baseBranch || "HEAD";
 
-            // Record current state
-            const { stdout: sha } = await execAsync("git rev-parse HEAD", { cwd: repoRoot });
-            const { stdout: currentBranchRaw } = await execAsync(
-              "git branch --show-current",
-              { cwd: repoRoot },
-            );
+            // Record current state (both reads are independent — run concurrently)
+            const [{ stdout: sha }, { stdout: currentBranchRaw }] = await Promise.all([
+              execAsync("git rev-parse HEAD", { cwd: repoRoot }),
+              execAsync("git branch --show-current", { cwd: repoRoot }),
+            ]);
             // Detached HEAD fallback: use the SHA itself
             const currentBranch = currentBranchRaw.trim() || sha.trim();
 
@@ -355,21 +354,28 @@ export function createWorktreeTools() {
 
           try {
             const files = await fs.readdir(dir);
-            for (const file of files) {
-              if (!file.endsWith(".json")) continue;
 
-              if (file.startsWith("_plan_")) {
-                // Plan metadata
-                if (args.planName && !file.includes(args.planName)) continue;
-                const raw = await fs.readFile(path.join(dir, file), "utf-8");
-                planMetas.push(JSON.parse(raw));
-              } else {
-                // Workstream metadata
-                if (args.planName && !file.startsWith(args.planName)) continue;
-                const raw = await fs.readFile(path.join(dir, file), "utf-8");
-                workstreamMetas.push(JSON.parse(raw));
-              }
-            }
+            // Filter files first, then read all matching files in parallel
+            const planFiles = files.filter(
+              (f) =>
+                f.endsWith(".json") &&
+                f.startsWith("_plan_") &&
+                (!args.planName || f.includes(args.planName)),
+            );
+            const workstreamFiles = files.filter(
+              (f) =>
+                f.endsWith(".json") &&
+                !f.startsWith("_plan_") &&
+                (!args.planName || f.startsWith(args.planName)),
+            );
+
+            const [planRaws, workstreamRaws] = await Promise.all([
+              Promise.all(planFiles.map((f) => fs.readFile(path.join(dir, f), "utf-8"))),
+              Promise.all(workstreamFiles.map((f) => fs.readFile(path.join(dir, f), "utf-8"))),
+            ]);
+
+            for (const raw of planRaws) planMetas.push(JSON.parse(raw));
+            for (const raw of workstreamRaws) workstreamMetas.push(JSON.parse(raw));
           } catch {
             // No metadata directory yet
           }
@@ -443,40 +449,60 @@ export function createWorktreeTools() {
             // No metadata directory
           }
 
-          for (const file of files) {
-            if (!file.endsWith(".json") || file.startsWith("_plan_")) continue;
-            if (!file.startsWith(`${args.planName}-`)) continue;
+          // Filter workstream files for this plan, then clean up all in parallel
+          const workstreamCleanupFiles = files.filter(
+            (f) =>
+              f.endsWith(".json") &&
+              !f.startsWith("_plan_") &&
+              f.startsWith(`${args.planName}-`),
+          );
 
-            const raw = await fs.readFile(path.join(dir, file), "utf-8");
-            const meta = JSON.parse(raw);
-            if (meta.status === "removed") continue;
+          const cleanupSettled = await Promise.allSettled(
+            workstreamCleanupFiles.map(async (file) => {
+              const wsResults: string[] = [];
 
-            const wtPath = meta.path;
-            const branch = meta.branch;
+              const raw = await fs.readFile(path.join(dir, file), "utf-8");
+              const meta = JSON.parse(raw);
+              if (meta.status === "removed") return wsResults;
 
-            // Remove worktree
-            try {
-              await execAsync(`git worktree remove "${wtPath}" --force`, {
-                cwd: repoRoot,
-              });
-              results.push(`Removed worktree: ${wtPath}`);
-            } catch {
+              const wtPath = meta.path;
+              const branch = meta.branch;
+
+              // Remove worktree
               try {
-                await execAsync("git worktree prune", { cwd: repoRoot });
-                results.push(`Pruned stale worktree: ${wtPath}`);
+                await execAsync(`git worktree remove "${wtPath}" --force`, {
+                  cwd: repoRoot,
+                });
+                wsResults.push(`Removed worktree: ${wtPath}`);
+              } catch {
+                try {
+                  await execAsync("git worktree prune", { cwd: repoRoot });
+                  wsResults.push(`Pruned stale worktree: ${wtPath}`);
+                } catch {}
+              }
+
+              // Delete branch
+              try {
+                await execAsync(`git branch -D "${branch}"`, { cwd: repoRoot });
+                wsResults.push(`Deleted branch: ${branch}`);
               } catch {}
+
+              // Update metadata
+              meta.status = "removed";
+              meta.removedAt = new Date().toISOString();
+              await fs.writeFile(path.join(dir, file), JSON.stringify(meta, null, 2));
+
+              return wsResults;
+            }),
+          );
+
+          // Collect results from all workstreams (including failures)
+          for (const settled of cleanupSettled) {
+            if (settled.status === "fulfilled") {
+              results.push(...settled.value);
+            } else {
+              results.push(`Warning cleaning up workstream: ${settled.reason?.message ?? settled.reason}`);
             }
-
-            // Delete branch
-            try {
-              await execAsync(`git branch -D "${branch}"`, { cwd: repoRoot });
-              results.push(`Deleted branch: ${branch}`);
-            } catch {}
-
-            // Update metadata
-            meta.status = "removed";
-            meta.removedAt = new Date().toISOString();
-            await fs.writeFile(path.join(dir, file), JSON.stringify(meta, null, 2));
           }
 
           // Run a final worktree prune

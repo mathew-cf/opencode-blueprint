@@ -11,7 +11,8 @@ export const RESTRICTED_AGENTS = [
   "planner",
   "orchestrator",
   "investigator",
-  "reviewer",
+  "reviewer-completeness",
+  "reviewer-structure",
 ];
 
 /** Tool name fragments that indicate a file-writing operation */

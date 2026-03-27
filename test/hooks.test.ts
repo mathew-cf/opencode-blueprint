@@ -87,14 +87,24 @@ describe("hooks", () => {
       ).rejects.toThrow("investigator");
     });
 
-    test("blocks reviewer from writing source files", async () => {
-      await registerAgent("s-rev", "reviewer");
+    test("blocks reviewer-completeness from writing source files", async () => {
+      await registerAgent("s-rev-c", "reviewer-completeness");
       await expect(
         guardrail(
-          { tool: "edit", sessionID: "s-rev", callID: "c1" },
+          { tool: "edit", sessionID: "s-rev-c", callID: "c1" },
           { args: { filePath: "src/thing.ts" } },
         ),
-      ).rejects.toThrow("reviewer");
+      ).rejects.toThrow("reviewer-completeness");
+    });
+
+    test("blocks reviewer-structure from writing source files", async () => {
+      await registerAgent("s-rev-s", "reviewer-structure");
+      await expect(
+        guardrail(
+          { tool: "edit", sessionID: "s-rev-s", callID: "c1" },
+          { args: { filePath: "src/thing.ts" } },
+        ),
+      ).rejects.toThrow("reviewer-structure");
     });
 
     // ── Allowed: workspace directory ──

@@ -55,7 +55,7 @@ describe("plugin entry point", () => {
     await hooks.config!(config);
 
     expect(config.agent).toBeDefined();
-    expect(Object.keys(config.agent)).toHaveLength(5);
+    expect(Object.keys(config.agent)).toHaveLength(6);
     expect(config.agent.planner.mode).toBe("primary");
     expect(config.agent.orchestrator.mode).toBe("primary");
     expect(config.agent.worker.mode).toBe("subagent");

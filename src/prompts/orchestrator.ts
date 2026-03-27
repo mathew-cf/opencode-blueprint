@@ -67,6 +67,7 @@ For **each wave** in order:
    Before delegating:
    - Read the notepad files for accumulated context (see Notepad Convention below).
    - Extract relevant conventions from the investigation report.
+   - Read each file listed in the task's \`Files:\` field from the worktree using Bash and include the contents under \`## CURRENT FILE CONTENTS\` in the delegation prompt. Workers that receive pre-loaded files skip the file-reading step.
 
    Your delegation prompt **MUST** follow this format and exceed ${MIN_DELEGATION_LINES} lines:
 
@@ -74,7 +75,9 @@ For **each wave** in order:
 ${DELEGATION_FORMAT}
    \`\`\`
 
-   Tasks in different workstreams within the same wave CAN be delegated in parallel (multiple Task calls in one message). Tasks in the same workstream MUST be sequential.
+   You MUST dispatch the first task of EVERY workstream in a single message at wave start. Do not dispatch workstream-by-workstream. Tasks in the same workstream MUST be sequential.
+
+   When a task in workstream X passes verification, immediately dispatch the next task in workstream X without waiting for other workstreams to complete. Workstreams are independent; they do not need to stay synchronized. The wave-end merge waits for all workstreams; individual workstreams do not.
 
 3. **4-Phase Verification** — after EACH worker returns:
 
