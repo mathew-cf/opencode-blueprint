@@ -47,32 +47,69 @@ describe("agent registration", () => {
     }
   });
 
-  test("investigator has write and edit disabled", () => {
+  test("investigator is read-only (edit denied)", () => {
     const config: Record<string, any> = {};
     registerAgents(config);
 
-    expect(config.agent.investigator.tools).toEqual({
-      write: false,
-      edit: false,
+    expect(config.agent.investigator.permission).toEqual({
+      edit: "deny",
     });
   });
 
+<<<<<<< Updated upstream
   test("reviewer has write, edit, and bash disabled", () => {
+||||||| Stash base
+  test("reviewer-completeness has write, edit, and bash disabled", () => {
+=======
+  test("reviewer-completeness is read-only with no bash", () => {
+>>>>>>> Stashed changes
     const config: Record<string, any> = {};
     registerAgents(config);
 
+<<<<<<< Updated upstream
     expect(config.agent.reviewer.tools).toEqual({
+      write: false,
+      edit: false,
+      bash: false,
+||||||| Stash base
+    expect(config.agent["reviewer-completeness"].tools).toEqual({
       write: false,
       edit: false,
       bash: false,
     });
   });
 
-  test("worker has no agent-level tool restrictions", () => {
+  test("reviewer-structure has write, edit, and bash disabled", () => {
     const config: Record<string, any> = {};
     registerAgents(config);
 
-    expect(config.agent.worker.tools).toBeUndefined();
+    expect(config.agent["reviewer-structure"].tools).toEqual({
+      write: false,
+      edit: false,
+      bash: false,
+=======
+    expect(config.agent["reviewer-completeness"].permission).toEqual({
+      edit: "deny",
+      bash: "deny",
+    });
+  });
+
+  test("reviewer-structure is read-only with no bash", () => {
+    const config: Record<string, any> = {};
+    registerAgents(config);
+
+    expect(config.agent["reviewer-structure"].permission).toEqual({
+      edit: "deny",
+      bash: "deny",
+>>>>>>> Stashed changes
+    });
+  });
+
+  test("worker has no agent-level permission restrictions", () => {
+    const config: Record<string, any> = {};
+    registerAgents(config);
+
+    expect(config.agent.worker.permission).toBeUndefined();
   });
 
   // ── blueprint tool scoping ──
@@ -81,27 +118,40 @@ describe("agent registration", () => {
     const config: Record<string, any> = {};
     registerAgents(config);
 
-    expect(config.tools).toBeDefined();
-    expect(config.tools["blueprint_*"]).toBe(false);
+    expect(config.permission).toBeDefined();
+    expect(config.permission["blueprint_*"]).toBe("deny");
   });
 
   test("orchestrator re-enables blueprint tools", () => {
     const config: Record<string, any> = {};
     registerAgents(config);
 
-    expect(config.agent.orchestrator.tools).toBeDefined();
-    expect(config.agent.orchestrator.tools["blueprint_*"]).toBe(true);
+    expect(config.agent.orchestrator.permission).toBeDefined();
+    expect(config.agent.orchestrator.permission["blueprint_*"]).toBe("allow");
   });
 
-  test("non-orchestrator blueprint agents do not re-enable blueprint tools", () => {
+  test("non-orchestrator agents do not re-enable blueprint tools", () => {
     const config: Record<string, any> = {};
     registerAgents(config);
 
+<<<<<<< Updated upstream
     // planner, investigator, reviewer, worker should NOT have blueprint_* enabled
     for (const name of ["planner", "investigator", "reviewer", "worker"]) {
       const tools = config.agent[name].tools;
       if (tools) {
         expect(tools["blueprint_*"]).not.toBe(true);
+||||||| Stash base
+    // planner, investigator, reviewer-completeness, reviewer-structure, worker should NOT have blueprint_* enabled
+    for (const name of ["planner", "investigator", "reviewer-completeness", "reviewer-structure", "worker"]) {
+      const tools = config.agent[name].tools;
+      if (tools) {
+        expect(tools["blueprint_*"]).not.toBe(true);
+=======
+    for (const name of ["planner", "investigator", "reviewer-completeness", "reviewer-structure", "worker"]) {
+      const perm = config.agent[name].permission;
+      if (perm) {
+        expect(perm["blueprint_*"]).not.toBe("allow");
+>>>>>>> Stashed changes
       }
     }
   });
@@ -110,18 +160,18 @@ describe("agent registration", () => {
     const config: Record<string, any> = {};
     registerAgents(config);
 
-    expect(config.agent.planner.tools).toBeDefined();
-    expect(config.agent.planner.tools.blueprint_plan_finalize).toBe(true);
+    expect(config.agent.planner.permission).toBeDefined();
+    expect(config.agent.planner.permission.blueprint_plan_finalize).toBe("allow");
   });
 
-  test("global blueprint disable preserves existing tools config", () => {
+  test("global blueprint disable preserves existing permission config", () => {
     const config: Record<string, any> = {
-      tools: { my_custom_tool: true },
+      permission: { my_custom_tool: "ask" },
     };
     registerAgents(config);
 
-    expect(config.tools.my_custom_tool).toBe(true);
-    expect(config.tools["blueprint_*"]).toBe(false);
+    expect(config.permission.my_custom_tool).toBe("ask");
+    expect(config.permission["blueprint_*"]).toBe("deny");
   });
 
   test("preserves existing agents in config", () => {
