@@ -19,15 +19,16 @@ src/
   index.ts            # Plugin entry — wires tools, hooks, config
   types.ts            # Shared interfaces (WorktreeMetadata, NotepadEntry, etc.)
   constants.ts        # WORKSPACE_DIR, RESTRICTED_AGENTS, limits
-  agents.ts           # registerAgents() — registers 5 agents via config hook
+  agents.ts           # registerAgents() — registers 6 agents via config hook
   hooks.ts            # Guardrail hook, session tracking, lifecycle cleanup
-  templates.ts        # Markdown templates for investigation, plan, delegation
+  templates.ts        # Markdown templates for investigation, plan, delegation (incl. file pre-loading)
   prompts/
-    planner.ts        # Planner agent system prompt
-    orchestrator.ts   # Orchestrator agent system prompt
+    planner.ts        # Planner agent system prompt (critical-path minimization, dual-reviewer dispatch)
+    orchestrator.ts   # Orchestrator agent system prompt (parallel dispatch, intra-wave continuation, file pre-loading)
     investigator.ts   # Investigator subagent prompt
-    reviewer.ts       # Reviewer subagent prompt
-    worker.ts         # Worker subagent prompt
+    reviewer.ts       # Reviewer-completeness subagent prompt (requirements, coverage, quality)
+    reviewer-structure.ts  # Reviewer-structure subagent prompt (atomicity, dependencies, conflicts)
+    worker.ts         # Worker subagent prompt (supports pre-loaded file contents)
   tools/
     worktree.ts       # blueprint_worktree_{create,merge,cleanup,list}
     notepad.ts        # blueprint_notepad_{read,write}
@@ -52,16 +53,17 @@ This is an [OpenCode plugin](https://opencode.ai/docs/plugins) built on `@openco
 
 **Plugin entry** (`src/index.ts`) exports a default `Plugin` function that returns:
 - `tool` — 8 custom tools (worktree management, notepad, progress, verify)
-- `config` — registers 5 agents (2 primary, 3 subagents)
+- `config` — registers 6 agents (2 primary, 4 subagents)
 - `chat.message` — tracks which agent owns each session
 - `tool.execute.before` — enforces write boundaries per agent
 - `event` — cleans up session state on deletion
 
 **Agent architecture:**
 - `planner` and `orchestrator` are `mode: "primary"` (visible in agent switcher)
-- `investigator`, `reviewer`, `worker` are `mode: "subagent"` (spawned via Task tool)
-- Restricted agents (planner, orchestrator, investigator, reviewer) cannot write files outside `.blueprint/` — enforced by the guardrail hook
+- `investigator`, `reviewer-completeness`, `reviewer-structure`, `worker` are `mode: "subagent"` (spawned via Task tool)
+- Restricted agents (planner, orchestrator, investigator, reviewer-completeness, reviewer-structure) cannot write files outside `.blueprint/` — enforced by the guardrail hook
 - Only `worker` agents can modify source code
+- The planner dispatches both reviewers in parallel; `reviewer-completeness` (Opus) checks requirements coverage and quality, `reviewer-structure` (Sonnet) checks task atomicity, dependencies, and file conflicts
 
 **Workspace:** All plugin state lives in `.blueprint/` within the project directory:
 - `.blueprint/investigations/` — investigation reports
