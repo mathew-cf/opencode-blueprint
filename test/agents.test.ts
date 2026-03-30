@@ -2,13 +2,12 @@ import { describe, test, expect } from "bun:test";
 import { registerAgents } from "../src/agents";
 
 describe("agent registration", () => {
-  test("registers all 6 agents on empty config", () => {
+  test("registers all 5 agents on empty config", () => {
     const config: Record<string, any> = {};
     registerAgents(config);
 
-    expect(Object.keys(config.agent)).toHaveLength(6);
-    expect(config.agent).toHaveProperty("planner");
-    expect(config.agent).toHaveProperty("orchestrator");
+    expect(Object.keys(config.agent)).toHaveLength(5);
+    expect(config.agent).toHaveProperty("blueprinter");
     expect(config.agent).toHaveProperty("investigator");
     expect(config.agent).toHaveProperty("reviewer-completeness");
     expect(config.agent).toHaveProperty("reviewer-structure");
@@ -19,8 +18,7 @@ describe("agent registration", () => {
     const config: Record<string, any> = {};
     registerAgents(config);
 
-    expect(config.agent.planner.mode).toBe("primary");
-    expect(config.agent.orchestrator.mode).toBe("primary");
+    expect(config.agent.blueprinter.mode).toBe("primary");
   });
 
   test("subagents have mode=subagent", () => {
@@ -95,32 +93,16 @@ describe("agent registration", () => {
     expect(config.permission["blueprint_*"]).toBe("deny");
   });
 
-  test("orchestrator re-enables blueprint tools", () => {
+  test("non-lifecycle agents do not re-enable blueprint tools", () => {
     const config: Record<string, any> = {};
     registerAgents(config);
 
-    expect(config.agent.orchestrator.permission).toBeDefined();
-    expect(config.agent.orchestrator.permission["blueprint_*"]).toBe("allow");
-  });
-
-  test("non-orchestrator agents do not re-enable blueprint tools", () => {
-    const config: Record<string, any> = {};
-    registerAgents(config);
-
-    for (const name of ["planner", "investigator", "reviewer-completeness", "reviewer-structure", "worker"]) {
+    for (const name of ["investigator", "reviewer-completeness", "reviewer-structure", "worker"]) {
       const perm = config.agent[name].permission;
       if (perm) {
         expect(perm["blueprint_*"]).not.toBe("allow");
       }
     }
-  });
-
-  test("planner has blueprint_plan_finalize enabled", () => {
-    const config: Record<string, any> = {};
-    registerAgents(config);
-
-    expect(config.agent.planner.permission).toBeDefined();
-    expect(config.agent.planner.permission.blueprint_plan_finalize).toBe("allow");
   });
 
   test("global blueprint disable preserves existing permission config", () => {
@@ -142,41 +124,7 @@ describe("agent registration", () => {
     registerAgents(config);
 
     expect(config.agent).toHaveProperty("my-custom-agent");
-    expect(config.agent).toHaveProperty("planner");
-    expect(Object.keys(config.agent)).toHaveLength(7);
-  });
-
-  test("planner prompt references .blueprint paths", () => {
-    const config: Record<string, any> = {};
-    registerAgents(config);
-
-    expect(config.agent.planner.prompt).toContain(".blueprint/");
-    expect(config.agent.planner.prompt).toContain("investigations");
-    expect(config.agent.planner.prompt).toContain("plans");
-  });
-
-  test("orchestrator prompt references blueprint tools", () => {
-    const config: Record<string, any> = {};
-    registerAgents(config);
-
-    expect(config.agent.orchestrator.prompt).toContain("blueprint_worktree_create");
-    expect(config.agent.orchestrator.prompt).toContain("blueprint_verify");
-    expect(config.agent.orchestrator.prompt).toContain("Notepad Convention");
-    expect(config.agent.orchestrator.prompt).toContain("blueprint_progress");
-  });
-
-  test("planner uses opus model", () => {
-    const config: Record<string, any> = {};
-    registerAgents(config);
-
-    expect(config.agent.planner.model).toContain("opus");
-  });
-
-  test("orchestrator uses sonnet model", () => {
-    const config: Record<string, any> = {};
-    registerAgents(config);
-
-    expect(config.agent.orchestrator.model).toContain("sonnet");
+    expect(Object.keys(config.agent)).toHaveLength(6);
   });
 
   test("reviewer-completeness uses opus model", () => {
@@ -191,5 +139,20 @@ describe("agent registration", () => {
     registerAgents(config);
 
     expect(config.agent["reviewer-structure"].model).toContain("sonnet");
+  });
+
+  test("blueprinter uses opus model", () => {
+    const config: Record<string, any> = {};
+    registerAgents(config);
+
+    expect(config.agent.blueprinter.model).toContain("opus");
+  });
+
+  test("blueprinter re-enables blueprint tools", () => {
+    const config: Record<string, any> = {};
+    registerAgents(config);
+
+    expect(config.agent.blueprinter.permission).toBeDefined();
+    expect(config.agent.blueprinter.permission["blueprint_*"]).toBe("allow");
   });
 });

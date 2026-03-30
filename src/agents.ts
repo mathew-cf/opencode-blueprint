@@ -1,5 +1,4 @@
-import { plannerPrompt } from "./prompts/planner";
-import { orchestratorPrompt } from "./prompts/orchestrator";
+import { blueprinterPrompt } from "./prompts/blueprinter";
 import { investigatorPrompt } from "./prompts/investigator";
 import { reviewerCompletenessPrompt } from "./prompts/reviewer";
 import { reviewerStructurePrompt } from "./prompts/reviewer-structure";
@@ -13,36 +12,21 @@ export function registerAgents(config: Record<string, any>): void {
   if (!config.agent) config.agent = {};
 
   // Disable blueprint_* tools globally so they don't consume context for
-  // non-blueprint agents.  Only the orchestrator re-enables them below.
+  // non-blueprint agents.  Only the blueprinter re-enables them below.
   if (!config.permission) config.permission = {};
   config.permission["blueprint_*"] = "deny";
 
   // -- Primary agents (visible in agent switcher) --
 
-  config.agent["planner"] = {
+  config.agent["blueprinter"] = {
     model: "anthropic/claude-opus-4-6",
     temperature: 0.1,
-    prompt: plannerPrompt,
+    prompt: blueprinterPrompt,
     mode: "primary",
-    color: "#3B82F6",
+    color: "#F97316",
     description:
-      "Investigate codebases and create structured implementation plans",
-    // Planner writes .blueprint/ files (guardrail hook enforces boundary).
-    // Only blueprint_plan_finalize is re-enabled from the global deny.
-    permission: {
-      blueprint_plan_finalize: "allow",
-    },
-  };
-
-  config.agent["orchestrator"] = {
-    model: "anthropic/claude-sonnet-4-6",
-    temperature: 0.1,
-    prompt: orchestratorPrompt,
-    mode: "primary",
-    color: "#10B981",
-    description:
-      "Execute plans by delegating tasks to workers in isolated worktrees",
-    // Orchestrator writes .blueprint/ files and runs all blueprint tools.
+      "Run the full Blueprint lifecycle from ticket to merged code",
+    // Blueprinter needs all blueprint tools for the full lifecycle.
     // Guardrail hook prevents writes outside .blueprint/.
     permission: {
       "blueprint_*": "allow",

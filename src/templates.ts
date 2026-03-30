@@ -1,7 +1,7 @@
 import { INVESTIGATIONS_DIR, PLANS_DIR } from "./constants";
 
 // ---------------------------------------------------------------------------
-// Investigation report — used by planner prompt as the target format
+// Investigation report — used by blueprinter prompt as the target format
 // ---------------------------------------------------------------------------
 export const INVESTIGATION_REPORT_FORMAT = `\
 # Investigation: {name}
@@ -29,7 +29,7 @@ export const INVESTIGATION_REPORT_FORMAT = `\
 `;
 
 // ---------------------------------------------------------------------------
-// Plan document — used by planner prompt as the target format
+// Plan document — used by blueprinter prompt as the target format
 // ---------------------------------------------------------------------------
 export const PLAN_FORMAT = `\
 # Plan: {name}
@@ -71,7 +71,7 @@ Investigation: ${INVESTIGATIONS_DIR}/{investigation-name}.md
 `;
 
 // ---------------------------------------------------------------------------
-// Delegation prompt — used by orchestrator to instruct worker subagents
+// Delegation prompt — used by blueprinter to instruct worker subagents
 // ---------------------------------------------------------------------------
 export const DELEGATION_FORMAT = `\
 ## TASK

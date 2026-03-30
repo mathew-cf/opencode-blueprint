@@ -55,9 +55,8 @@ describe("plugin entry point", () => {
     await hooks.config!(config);
 
     expect(config.agent).toBeDefined();
-    expect(Object.keys(config.agent)).toHaveLength(6);
-    expect(config.agent.planner.mode).toBe("primary");
-    expect(config.agent.orchestrator.mode).toBe("primary");
+    expect(Object.keys(config.agent)).toHaveLength(5);
+    expect(config.agent.blueprinter.mode).toBe("primary");
     expect(config.agent.worker.mode).toBe("subagent");
   });
 
@@ -70,8 +69,10 @@ describe("plugin entry point", () => {
     expect(config.command).toBeDefined();
     expect(config.command).toHaveProperty("plan");
     expect(config.command).toHaveProperty("execute");
-    expect(config.command.plan.agent).toBe("planner");
-    expect(config.command.execute.agent).toBe("orchestrator");
+    expect(config.command).toHaveProperty("blueprint");
+    expect(config.command.plan.agent).toBe("blueprinter");
+    expect(config.command.execute.agent).toBe("blueprinter");
+    expect(config.command.blueprint.agent).toBe("blueprinter");
   });
 
   test("chat.message hook is a function", async () => {

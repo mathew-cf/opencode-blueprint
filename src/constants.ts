@@ -8,8 +8,7 @@ export const WORKTREE_CHECKOUTS_DIR = `${WORKSPACE_DIR}/wt`;
 
 /** Agents that are NOT allowed to write files outside .blueprint/ */
 export const RESTRICTED_AGENTS = [
-  "planner",
-  "orchestrator",
+  "blueprinter",
   "investigator",
   "reviewer-completeness",
   "reviewer-structure",

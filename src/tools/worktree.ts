@@ -58,7 +58,7 @@ export function createWorktreeTools() {
         "Create a git worktree for an isolated workstream. Returns the absolute path to the new worktree directory.",
         "",
         "When called WITHOUT a workstream, creates a plan-level worktree that acts as the",
-        "orchestrator's isolated execution base. All workstream merges target this worktree.",
+        "blueprinter's isolated execution base. All workstream merges target this worktree.",
         "Idempotent: returns the existing path if the plan worktree already exists.",
         "",
         "When called WITH a workstream, creates a workstream worktree branched from the",

@@ -53,7 +53,7 @@ export function createGuardrailHook(projectDirectory: string) {
         `[Blueprint] Agent "${agent}" cannot write files outside ${WORKSPACE_DIR}/. ` +
           `Attempted: ${filePath}\n` +
           `Only worker subagents may modify source files. ` +
-          `Use the orchestrator to delegate implementation work.`,
+          `Use the blueprinter to delegate implementation work.`,
       );
     }
   };

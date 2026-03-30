@@ -2,27 +2,43 @@ import { describe, test, expect } from "bun:test";
 import { registerCommands } from "../src/commands";
 
 describe("command registration", () => {
-  test("registers /plan and /execute commands on empty config", () => {
+  test("registers /plan, /execute, and /blueprint commands on empty config", () => {
     const config: Record<string, any> = {};
     registerCommands(config);
 
-    expect(Object.keys(config.command)).toHaveLength(2);
+    expect(Object.keys(config.command)).toHaveLength(3);
     expect(config.command).toHaveProperty("plan");
     expect(config.command).toHaveProperty("execute");
+    expect(config.command).toHaveProperty("blueprint");
   });
 
-  test("/plan targets the planner agent", () => {
+  test("/plan targets the blueprinter agent", () => {
     const config: Record<string, any> = {};
     registerCommands(config);
 
-    expect(config.command.plan.agent).toBe("planner");
+    expect(config.command.plan.agent).toBe("blueprinter");
   });
 
-  test("/execute targets the orchestrator agent", () => {
+  test("/execute targets the blueprinter agent", () => {
     const config: Record<string, any> = {};
     registerCommands(config);
 
-    expect(config.command.execute.agent).toBe("orchestrator");
+    expect(config.command.execute.agent).toBe("blueprinter");
+  });
+
+  test("/plan template contains phase-bounding instruction", () => {
+    const config: Record<string, any> = {};
+    registerCommands(config);
+
+    expect(config.command.plan.template).toContain("Do NOT proceed to Phase 4");
+    expect(config.command.plan.template).toContain("STOP after Phase 3");
+  });
+
+  test("/execute template contains phase-skip instruction", () => {
+    const config: Record<string, any> = {};
+    registerCommands(config);
+
+    expect(config.command.execute.template).toContain("Skip Phases 1, 2, and 3 entirely");
   });
 
   test("both commands have description and template", () => {
@@ -64,6 +80,21 @@ describe("command registration", () => {
     expect(config.command).toHaveProperty("my-custom-cmd");
     expect(config.command).toHaveProperty("plan");
     expect(config.command).toHaveProperty("execute");
-    expect(Object.keys(config.command)).toHaveLength(3);
+    expect(config.command).toHaveProperty("blueprint");
+    expect(Object.keys(config.command)).toHaveLength(4);
+  });
+
+  test("/blueprint targets the blueprinter agent", () => {
+    const config: Record<string, any> = {};
+    registerCommands(config);
+
+    expect(config.command.blueprint.agent).toBe("blueprinter");
+  });
+
+  test("/blueprint template includes $ARGUMENTS", () => {
+    const config: Record<string, any> = {};
+    registerCommands(config);
+
+    expect(config.command.blueprint.template).toContain("$ARGUMENTS");
   });
 });

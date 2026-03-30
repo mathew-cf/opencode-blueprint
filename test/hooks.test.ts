@@ -17,13 +17,13 @@ describe("hooks", () => {
     test("tracks agent for session", async () => {
       const hook = createChatMessageHook();
       await hook(
-        { sessionID: "s1", agent: "planner", messageID: "m1" },
+        { sessionID: "s1", agent: "blueprinter", messageID: "m1" },
         {} as any,
       );
 
       // Verify by using guardrail hook (it reads from the same map)
       const guardrail = createGuardrailHook(projectDir);
-      // This should throw because planner can't write outside .blueprint
+      // This should throw because blueprinter can't write outside .blueprint
       await expect(
         guardrail(
           { tool: "write", sessionID: "s1", callID: "c1" },
@@ -57,26 +57,6 @@ describe("hooks", () => {
 
     // ── Restricted agents ──
 
-    test("blocks planner from writing source files", async () => {
-      await registerAgent("s-planner", "planner");
-      await expect(
-        guardrail(
-          { tool: "write", sessionID: "s-planner", callID: "c1" },
-          { args: { filePath: "src/main.ts" } },
-        ),
-      ).rejects.toThrow("planner");
-    });
-
-    test("blocks orchestrator from writing source files", async () => {
-      await registerAgent("s-orch", "orchestrator");
-      await expect(
-        guardrail(
-          { tool: "edit", sessionID: "s-orch", callID: "c1" },
-          { args: { filePath: "/projects/myapp/src/main.ts" } },
-        ),
-      ).rejects.toThrow("orchestrator");
-    });
-
     test("blocks investigator from writing source files", async () => {
       await registerAgent("s-inv", "investigator");
       await expect(
@@ -107,26 +87,23 @@ describe("hooks", () => {
       ).rejects.toThrow("reviewer-structure");
     });
 
-    // ── Allowed: workspace directory ──
-
-    test("allows planner to write inside .blueprint/", async () => {
-      await registerAgent("s-planner2", "planner");
-      // Should NOT throw
-      await guardrail(
-        { tool: "write", sessionID: "s-planner2", callID: "c1" },
-        { args: { filePath: `${WORKSPACE_DIR}/plans/myplan.md` } },
-      );
+    test("blocks blueprinter from writing source files", async () => {
+      await registerAgent("s-blueprinter", "blueprinter");
+      await expect(
+        guardrail(
+          { tool: "write", sessionID: "s-blueprinter", callID: "c1" },
+          { args: { filePath: "src/main.ts" } },
+        ),
+      ).rejects.toThrow("blueprinter");
     });
 
-    test("allows orchestrator to write inside .blueprint/", async () => {
-      await registerAgent("s-orch2", "orchestrator");
+    // ── Allowed: workspace directory ──
+
+    test("allows blueprinter to write inside .blueprint/", async () => {
+      await registerAgent("s-blueprinter2", "blueprinter");
       await guardrail(
-        { tool: "write", sessionID: "s-orch2", callID: "c1" },
-        {
-          args: {
-            filePath: `/projects/myapp/${WORKSPACE_DIR}/notepads/p/learnings.md`,
-          },
-        },
+        { tool: "write", sessionID: "s-blueprinter2", callID: "c1" },
+        { args: { filePath: `${WORKSPACE_DIR}/plans/myplan.md` } },
       );
     });
 
@@ -152,17 +129,17 @@ describe("hooks", () => {
     // ── Non-write tools are ignored ──
 
     test("ignores read tools for restricted agents", async () => {
-      await registerAgent("s-planner3", "planner");
+      await registerAgent("s-blueprinter3", "blueprinter");
       await guardrail(
-        { tool: "read", sessionID: "s-planner3", callID: "c1" },
+        { tool: "read", sessionID: "s-blueprinter3", callID: "c1" },
         { args: { filePath: "src/main.ts" } },
       );
     });
 
     test("ignores grep tool", async () => {
-      await registerAgent("s-planner4", "planner");
+      await registerAgent("s-blueprinter4", "blueprinter");
       await guardrail(
-        { tool: "grep", sessionID: "s-planner4", callID: "c1" },
+        { tool: "grep", sessionID: "s-blueprinter4", callID: "c1" },
         { args: { pattern: "foo", path: "src/" } },
       );
     });
@@ -180,18 +157,18 @@ describe("hooks", () => {
     // ── Edge cases ──
 
     test("no-ops when tool args lack filePath", async () => {
-      await registerAgent("s-planner5", "planner");
+      await registerAgent("s-blueprinter5", "blueprinter");
       // No filePath/path in args → guardrail can't check → should not throw
       await guardrail(
-        { tool: "write", sessionID: "s-planner5", callID: "c1" },
+        { tool: "write", sessionID: "s-blueprinter5", callID: "c1" },
         { args: { content: "hello" } },
       );
     });
 
     test("handles absolute path inside workspace", async () => {
-      await registerAgent("s-planner6", "planner");
+      await registerAgent("s-blueprinter6", "blueprinter");
       await guardrail(
-        { tool: "write", sessionID: "s-planner6", callID: "c1" },
+        { tool: "write", sessionID: "s-blueprinter6", callID: "c1" },
         {
           args: {
             filePath: `${projectDir}/${WORKSPACE_DIR}/investigations/report.md`,
@@ -209,7 +186,7 @@ describe("hooks", () => {
 
       // Register a session
       await chatHook(
-        { sessionID: "s-delete-me", agent: "planner", messageID: "m" },
+        { sessionID: "s-delete-me", agent: "blueprinter", messageID: "m" },
         {} as any,
       );
 
