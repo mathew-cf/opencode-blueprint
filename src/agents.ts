@@ -19,7 +19,7 @@ export function registerAgents(config: Record<string, any>): void {
   // -- Primary agents (visible in agent switcher) --
 
   config.agent["blueprinter"] = {
-    model: "anthropic/claude-opus-4-6",
+    model: "anthropic/claude-opus-4-7",
     temperature: 0.1,
     prompt: blueprinterPrompt,
     mode: "primary",
@@ -49,7 +49,7 @@ export function registerAgents(config: Record<string, any>): void {
   };
 
   config.agent["reviewer-completeness"] = {
-    model: "anthropic/claude-opus-4-6",
+    model: "anthropic/claude-opus-4-7",
     temperature: 0.1,
     prompt: reviewerCompletenessPrompt,
     mode: "subagent",
